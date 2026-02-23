@@ -60,7 +60,6 @@ const FEATURES_BENTO = [
   { icon: "🤝", title: "Team Builder", desc: "Find teammates and form squads for competitions.", span: "wide", gradient: "linear-gradient(135deg,#764ba2,#667eea)" },
 ];
 
-
 const Home = () => {
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
@@ -164,7 +163,7 @@ const Home = () => {
         </div>
       </header>
 
-      {/* HERO */}
+      {/*HERO */}
       <section id="top" className="lp-hero">
         <div className="lp-hero__orb lp-hero__orb--1" />
         <div className="lp-hero__orb lp-hero__orb--2" />
@@ -267,7 +266,7 @@ const Home = () => {
         ))}
       </section>
 
-      {/* FEATURES – BENTO GRID */}
+      {/*FEATURES*/}
       <section
         id="features"
         className={`lp-section lp-features lp-reveal ${featuresInView ? 'lp-reveal--visible' : ''}`}
@@ -295,7 +294,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* EVENTS – HORIZONTAL SCROLL */}
+      {/* EVENTS */}
       <section
         id="events"
         className={`lp-section lp-events lp-reveal ${eventsInView ? 'lp-reveal--visible' : ''}`}
@@ -340,6 +339,7 @@ const Home = () => {
         </div>
       </section>
 
+      {/*HOW IT WORKS */}
       <section
         className={`lp-section lp-how lp-reveal ${howInView ? 'lp-reveal--visible' : ''}`}
         ref={howRef}
@@ -429,7 +429,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* CONTACT */}
+      {/*CONTACT */}
       <section
         id="contact"
         className={`lp-section lp-contact lp-reveal ${contactInView ? 'lp-reveal--visible' : ''}`}
