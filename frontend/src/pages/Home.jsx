@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+// import { Link } from "react-router-dom";
 import './Home.css';
 import Chatbot from '../components/Chatbot';
+import FAQ from './FAQ';
+import About from './About';
 
 const useCounter = (end, duration = 2000, start = false) => {
   const [count, setCount] = useState(0);
@@ -119,12 +122,32 @@ const Home = () => {
           </button>
 
           <nav className={`lp-nav__links ${menuOpen ? 'lp-nav__links--open' : ''}`}>
-            {['features', 'events', 'testimonials', 'contact'].map(s => (
-              <button key={s} className="lp-nav__link" onClick={() => scrollTo(s)}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
-          </nav>
+  
+  {/* Scroll links */}
+  {['features', 'events', 'testimonials', 'contact'].map(s => (
+    <button key={s} className="lp-nav__link" onClick={() => scrollTo(s)}>
+      {s.charAt(0).toUpperCase() + s.slice(1)}
+    </button>
+  ))}
+
+  {/* New pages
+  <Link to="/faq" className="lp-nav__link">
+    FAQ
+  </Link>
+
+  <Link to="/about" className="lp-nav__link">
+    About
+  </Link> */}
+  {/* Same page scroll */}
+<button className="lp-nav__link" onClick={() => scrollTo('faq')}>
+  FAQ
+</button>
+
+<button className="lp-nav__link" onClick={() => scrollTo('about')}>
+  About
+</button>
+
+</nav>
 
           <div className="lp-nav__cta">
             <button className="lp-btn lp-btn--ghost" onClick={() => navigate('/login')}>Sign In</button>
@@ -463,6 +486,16 @@ const Home = () => {
           </div>
         </div>
       </section>
+      
+
+{/* FAQ SECTION */}
+<section id="faq" className="lp-section">
+  <FAQ />
+</section>
+{/* ABOUT SECTION */}
+<section id="about" className="lp-section">
+  <About />
+</section>
 
       {/*FOOTER */}
       <footer className="lp-footer lp-footer--reveal">

@@ -6,6 +6,8 @@ import AdminDashboard from "./pages/dashboardAdmin";
 import Events from "./pages/Events";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import FAQ from "./pages/FAQ";
+import About from "./pages/About";
 
 function App() {
   return (
@@ -40,6 +42,9 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/" element={<Home />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/about" element={<About />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

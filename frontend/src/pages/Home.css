@@ -312,6 +312,9 @@
   border-radius: 8px;
   transition: var(--transition);
   text-transform: capitalize;
+
+  /* 🔥 ADD THIS */
+  text-decoration: none;
 }
 
 .lp-nav__link:hover {
