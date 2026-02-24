@@ -3,15 +3,14 @@ import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import './AdminDashboard.css';
 import Chatbot from '../components/chatbot';
-
-// const eventImages = {
-//   tech: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-//   music: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-//   workshop: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-//   networking: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-//   charity: 'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-//   default: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-// };
+const eventImages = {
+  tech: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+  music: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+  workshop: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+  networking: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+  charity: 'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+  default: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+};
 
 export default function AdminDashboard() {
   const { user, token, logout } = useContext(AuthContext);
@@ -23,7 +22,8 @@ export default function AdminDashboard() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [setShowReportModal] = useState(false);
+  const [showUsersModal, setShowUsersModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -57,8 +57,7 @@ export default function AdminDashboard() {
       setLoading(true);
       setError(null);
 
-      // Fetch events
-      const eventsResponse = await fetch(
+      const response = await fetch(
         "http://localhost:5000/api/dashboard/admin/events",
         {
           headers: {
@@ -66,64 +65,24 @@ export default function AdminDashboard() {
           }
         }
       );
-      const events = await eventsResponse.json();
-
-      // Fetch participants/registrations
-      let participants = [];
-      let totalRegistrations = 0;
-      try {
-        const registrationsResponse = await fetch(
-          "http://localhost:5000/api/registrations/admin/all",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        );
-        if (registrationsResponse.ok) {
-          participants = await registrationsResponse.json();
-          totalRegistrations = participants.length;
-        }
-      } catch (regErr) {
-        console.log('Could not fetch registrations:', regErr);
-      }
-
-      // Transform participants to user format
-      const uniqueUsers = Array.from(
-        new Map(
-          participants.map(p => [
-            p.email,
-            {
-              id: p._id || p.email,
-              name: p.firstName ? `${p.firstName} ${p.lastName}` : p.name,
-              email: p.email,
-              role: 'student',
-              events: 1,
-              joined: p.createdAt,
-              status: p.status
-            }
-          ])
-        ).values()
-      );
-
+      const events = await response.json();
       setStats({
         totalEvents: events.length,
         activeEvents: events.filter(e => e.status === 'active').length,
-        totalRegistrations: totalRegistrations,
-        avgParticipants: events.length > 0 ? Math.round(totalRegistrations / events.length) : 0,
+        totalRegistrations: 0,
+        avgParticipants: 0,
         totalRevenue: events.reduce(
-          (sum, event) => totalRegistrations * (event.ticketPrice ),
+          (sum, event) => sum + (event.ticketPrice || 0),
           0
         ),
         growth: 0,
         events: events,
-        users: uniqueUsers,
+        users: [],
         recentActivity: []
       });
       setLoading(false);
 
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
       setError('Failed to load dashboard data');
       setLoading(false);
     }
@@ -292,62 +251,8 @@ export default function AdminDashboard() {
 
   // Handle report generation
   const handleGenerateReport = () => {
-    if (!stats?.events) {
-      alert('No data available to generate report');
-      return;
-    }
-
-    // Filter events by date range
-    const filteredEvents = stats.events.filter(event => {
-      const eventDate = new Date(event.eventDate);
-      const startDate = new Date(reportFilters.startDate);
-      const endDate = new Date(reportFilters.endDate);
-      return eventDate >= startDate && eventDate <= endDate;
-    });
-
-    if (filteredEvents.length === 0) {
-      alert('No events in the selected date range');
-      return;
-    }
-
-    // Prepare report data
-    const totalReg = filteredEvents.reduce((sum, e) => sum + (e.registered || 0), 0);
-    const totalRev = filteredEvents.reduce((sum, e) => sum + (e.revenue || 0), 0);
-    const avgConversion = Math.round(
-      (totalReg / filteredEvents.reduce((sum, e) => sum + (e.capacity || 1), 0)) * 100
-    );
-
-    if (reportFilters.format === 'csv') {
-      // Generate CSV
-      const headers = ['Event Name', 'Date', 'Location', 'Registrations', 'Capacity', 'Revenue', 'Conversion Rate'];
-      const rows = filteredEvents.map(event => [
-        event.title,
-        new Date(event.eventDate).toLocaleDateString(),
-        event.location,
-        event.registered || 0,
-        event.capacity || 0,
-        event.revenue || 0,
-        event.capacity ? Math.round(((event.registered || 0) / event.capacity) * 100) + '%' : '0%'
-      ]);
-
-      let csv = headers.join(',') + '\n';
-      csv += rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-      csv += '\n\nSUMMARY\n';
-      csv += `Total Events,${filteredEvents.length}\n`;
-      csv += `Total Registrations,${totalReg}\n`;
-      csv += `Total Revenue,$${totalRev.toLocaleString()}\n`;
-      csv += `Average Conversion Rate,${avgConversion}%\n`;
-
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `event_report_${new Date().toISOString().split('T')[0]}.csv`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } else {
-      alert(`${reportFilters.format.toUpperCase()} report generation not yet implemented. CSV export is available.`);
-    }
+    alert(`Generating ${reportFilters.format.toUpperCase()} report from ${reportFilters.startDate} to ${reportFilters.endDate}`);
+    setShowReportModal(false);
   };
 
   // Handle logout
@@ -364,15 +269,15 @@ export default function AdminDashboard() {
   };
 
   // Get status color
-  // const getStatusColor = (status) => {
-  //   const colors = {
-  //     upcoming: '#4f46e5',
-  //     ongoing: '#ea580c',
-  //     completed: '#16a34a',
-  //     cancelled: '#dc2626'
-  //   };
-  //   return colors[status] || '#6b7280';
-  // };
+  const getStatusColor = (status) => {
+    const colors = {
+      upcoming: '#4f46e5',
+      ongoing: '#ea580c',
+      completed: '#16a34a',
+      cancelled: '#dc2626'
+    };
+    return colors[status] || '#6b7280';
+  };
 
   if (error) {
     return (
@@ -756,46 +661,38 @@ export default function AdminDashboard() {
             )}
 
             {/* Reports Tab */}
-            {activeTab === 'reports' && stats && (
+            {activeTab === 'reports' && (
               <div className="reports-tab">
                 <h2>Analytics & Reports</h2>
                 
-                {/* Quick Stats - Dynamic */}
+                {/* Quick Stats */}
                 <div className="quick-stats">
                   <div className="quick-stat-card">
                     <span className="quick-stat-icon">📊</span>
                     <div className="quick-stat-info">
                       <h4>Conversion Rate</h4>
-                      <span>
-                        {stats.totalEvents > 0 
-                          ? Math.round((stats.totalRegistrations / (stats.totalEvents * 100)) * 100) 
-                          : 0}%
-                      </span>
+                      <span>68.5%</span>
                     </div>
                   </div>
                   <div className="quick-stat-card">
                     <span className="quick-stat-icon">👥</span>
                     <div className="quick-stat-info">
                       <h4>Active Users</h4>
-                      <span>{stats.users?.length || 0}</span>
+                      <span>1,245</span>
                     </div>
                   </div>
                   <div className="quick-stat-card">
                     <span className="quick-stat-icon">💰</span>
                     <div className="quick-stat-info">
                       <h4>Avg. Revenue</h4>
-                      <span>
-                        ${stats.totalEvents > 0 
-                          ? Math.round(stats.totalRevenue / stats.totalEvents) 
-                          : 0}
-                      </span>
+                      <span>$1,250</span>
                     </div>
                   </div>
                   <div className="quick-stat-card">
                     <span className="quick-stat-icon">📈</span>
                     <div className="quick-stat-info">
                       <h4>Growth</h4>
-                      <span>+{stats.growth || 0}%</span>
+                      <span>+15.3%</span>
                     </div>
                   </div>
                 </div>
@@ -849,7 +746,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Stats - Dynamic */}
+                {/* Stats */}
                 <div className="report-stats">
                   <div className="stat-box">
                     <span className="stat-label">Total Events</span>
@@ -865,67 +762,33 @@ export default function AdminDashboard() {
                   </div>
                   <div className="stat-box">
                     <span className="stat-label">Total Revenue</span>
-                    <span className="stat-number">${stats.totalRevenue?.toLocaleString() || 0}</span>
+                    <span className="stat-number">${stats.totalRevenue?.toLocaleString()}</span>
                   </div>
                 </div>
 
-                {/* Charts - Dynamic */}
+                {/* Charts */}
                 <div className="report-charts">
                   <div className="chart-card">
                     <h3>Registration Trends</h3>
                     <div className="chart-placeholder">
-                      <div style={{ padding: '20px', textAlign: 'center' }}>
-                        <p style={{ marginBottom: '10px' }}>📊 Total Registrations</p>
-                        <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#3498db' }}>
-                          {stats.totalRegistrations}
-                        </p>
-                        <p style={{ fontSize: '12px', color: '#666' }}>
-                          Across {stats.totalEvents} events
-                        </p>
-                      </div>
+                      📊 Chart visualization would go here
                     </div>
                   </div>
                   <div className="chart-card">
-                    <h3>Revenue Overview</h3>
+                    <h3>Revenue by Category</h3>
                     <div className="chart-placeholder">
-                      <div style={{ padding: '20px', textAlign: 'center' }}>
-                        <p style={{ marginBottom: '10px' }}>💰 Total Revenue</p>
-                        <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#27ae60' }}>
-                          ${stats.totalRevenue?.toLocaleString() || 0}
-                        </p>
-                        <p style={{ fontSize: '12px', color: '#666' }}>
-                          Avg: ${stats.totalEvents > 0 ? Math.round(stats.totalRevenue / stats.totalEvents) : 0} per event
-                        </p>
-                      </div>
+                      📈 Chart visualization would go here
                     </div>
                   </div>
                 </div>
 
-                {/* Report Table - Dynamic with Filtering */}
+                {/* Report Table */}
                 <div className="report-table-section">
                   <div className="report-table-header">
                     <h3>Event Performance</h3>
                     <div className="table-actions">
-                      <button className="table-action-btn" onClick={() => {
-                        const filteredData = stats.events
-                          ?.filter(event => {
-                            const eventDate = new Date(event.eventDate);
-                            const startDate = new Date(reportFilters.startDate);
-                            const endDate = new Date(reportFilters.endDate);
-                            return eventDate >= startDate && eventDate <= endDate;
-                          })
-                          .map(e => `${e.title},${new Date(e.eventDate).toLocaleDateString()},${e.registered}/${e.capacity},${e.revenue || 0},${Math.round((e.registered/(e.capacity||1))*100)}%`)
-                          .join('\n');
-                        
-                        const csv = 'Event Name,Date,Registrations,Revenue,Conversion\n' + filteredData;
-                        const blob = new Blob([csv], { type: 'text/csv' });
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `report_${new Date().toISOString().split('T')[0]}.csv`;
-                        a.click();
-                      }}>📥 Export</button>
-                      <button className="table-action-btn" onClick={() => window.print()}>🖨️ Print</button>
+                      <button className="table-action-btn">📥 Export</button>
+                      <button className="table-action-btn">🖨️ Print</button>
                     </div>
                   </div>
                   <table className="report-table">
@@ -939,23 +802,15 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {stats.events
-                        ?.filter(event => {
-                          const eventDate = new Date(event.eventDate);
-                          const startDate = new Date(reportFilters.startDate);
-                          const endDate = new Date(reportFilters.endDate);
-                          const isInDateRange = eventDate >= startDate && eventDate <= endDate;
-                          return isInDateRange;
-                        })
-                        .map(event => (
-                          <tr key={event._id}>
-                            <td>{event.title}</td>
-                            <td>{new Date(event.eventDate).toLocaleDateString()}</td>
-                            <td>{event.registered || 0}/{event.capacity || 0}</td>
-                            <td>${(event.revenue || 0).toLocaleString()}</td>
-                            <td>{event.capacity ? Math.round(((event.registered || 0)/event.capacity)*100) : 0}%</td>
-                          </tr>
-                        ))}
+                      {stats.events?.map(event => (
+                        <tr key={event._id}>
+                          <td>{event.title}</td>
+                          <td>{new Date(event.eventDate).toLocaleDateString()}</td>
+                          <td>{event.registered}/{event.capacity}</td>
+                          <td>${event.revenue?.toLocaleString()}</td>
+                          <td>{Math.round((event.registered/event.capacity)*100)}%</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -1272,7 +1127,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-      <Chatbot />
     </div>
   );
 }
