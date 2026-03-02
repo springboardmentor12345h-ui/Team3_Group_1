@@ -26,7 +26,8 @@ const eventSchema = new mongoose.Schema({
     default: null   // null means FREE
   },
   image: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FileUpload',
     required: true
   },
   category: {

@@ -20,6 +20,7 @@ const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
+const fileRoutes = require("./routes/fileRoutes");
 
 app.use("/api/auth", authRoutes);
 
@@ -39,9 +40,13 @@ app.get(
     res.redirect(`${frontend}/login?token=${req.user.token}`);
   }
 );
+
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/registrations", registrationRoutes);
+app.use("/api/files", fileRoutes);
+
+// Legacy uploads endpoint (optional - for backward compatibility)
 app.use("/uploads", express.static("uploads"));
 
 const PORT = process.env.PORT || 5000;

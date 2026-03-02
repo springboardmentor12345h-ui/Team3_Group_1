@@ -1301,11 +1301,27 @@ function StatCard({ title, value, icon, trend, trendType = 'positive', onClick }
 
 // Event Card Component
 function EventCard({ event, onClick, onEdit }) {
+  // Determine image source: support legacy filename (string) and new FileUpload object
+  const getImageSrc = () => {
+    if (!event.image) return 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80';
+    // If populated object from FileUpload
+    if (typeof event.image === 'object' && event.image._id) {
+      return `http://localhost:5000/api/files/download/${event.image._id}`;
+    }
+    // If image is a string filename/path
+    if (typeof event.image === 'string') {
+      // if it's already a full URL
+      if (event.image.startsWith('http')) return event.image;
+      return `http://localhost:5000/uploads/${event.image}`;
+    }
+    return 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80';
+  };
+
   return (
     <div className="event-card" onClick={onClick}>
       <div className="event-image-container">
         <img
-          src={`http://localhost:5000/uploads/${event.image}`}
+          src={getImageSrc()}
           alt={event.title}
           className="event-image"
         />

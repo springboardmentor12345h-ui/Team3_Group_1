@@ -158,8 +158,26 @@ exports.createEvent = async (req, res) => {
       eventDate,
       location,
       registrationEndDate,
-      ticketPrice
+      ticketPrice,
+      category
     } = req.body;
+
+    if (!title || !description || !eventDate || !location || !registrationEndDate) {
+      return res.status(400).json({ msg: 'Missing required fields' });
+    }
+
+    // If an image is provided, save it to MongoDB using the file service
+    let imageId = null;
+    if (req.file && req.file.buffer) {
+      const { saveFile } = require('../services/fileService');
+      const fileDoc = await saveFile(req.file, req.user.id, 'event', null);
+      imageId = fileDoc._id;
+    }
+
+    // If image is required by model, ensure it's present
+    if (!imageId) {
+      return res.status(400).json({ msg: 'Event image is required' });
+    }
 
     const event = new Event({
       title,
@@ -168,11 +186,13 @@ exports.createEvent = async (req, res) => {
       location,
       registrationEndDate,
       ticketPrice: ticketPrice || null,
-      image: req.file ? req.file.filename : null,
+      category: category || 'Other',
+      image: imageId,
       admin: req.user.id
     });
 
     await event.save();
+    await event.populate('image', '-data');
 
     res.status(201).json(event);
 

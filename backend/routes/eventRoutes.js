@@ -1,23 +1,24 @@
 const express = require("express");
-const router = express.Router();   // ✅ THIS WAS MISSING
-
+const router = express.Router();
 const Event = require("../models/Event");
-const { createEvent } = require("../controllers/Eventcontroller");
+const { createEvent, getAllEvents, getEventById, updateEvent, deleteEvent } = require("../controllers/Eventcontroller");
 const auth = require("../middleware/auth");
-const { getAllEvents } = require("../controllers/Eventcontroller");
+const upload = require("../middleware/upload");
 
-router.get("/events", getAllEvents);
-// Create Event
-router.post("/create", auth, createEvent);
-router.get("/events", getAllEvents);
-// Get All Events
-router.get("/all", auth, async (req, res) => {
-  try {
-    const events = await Event.find().sort({ createdAt: -1 });
-    res.json(events);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
+// Get all events (public)
+router.get("/", getAllEvents);
+router.get("/all", getAllEvents);
 
-module.exports = router;   // ✅ EXPORT ROUTER
+// Get single event by ID
+router.get("/:id", getEventById);
+
+// Create Event (with image upload)
+router.post("/create", auth, upload.single('image'), createEvent);
+
+// Update Event (with optional image upload)
+router.put("/:id", auth, upload.single('image'), updateEvent);
+
+// Delete Event
+router.delete("/:id", auth, deleteEvent);
+
+module.exports = router;
