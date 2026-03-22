@@ -5,6 +5,14 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import './MyRegistrations.css';
 
+const API_URL = process.env.REACT_APP_API || 'http://localhost:5000';
+
+const getSafeImageUrl = (image) => {
+    if (!image) return 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80';
+    if (image.startsWith('http')) return image;
+    return `${API_URL}/uploads/${encodeURIComponent(image)}`;
+};
+
 const CATEGORIES = [
     { id: 'all', name: 'All', emoji: '🌟' },
     { id: 'tech', name: 'Technology', emoji: '💻' },
@@ -31,7 +39,7 @@ const MyRegistrations = () => {
         const fetchUserData = async () => {
             if (!token) return;
             try {
-                const profileRes = await fetch('http://localhost:5000/api/auth/profile', {
+                const profileRes = await fetch(`${API_URL}/api/auth/profile`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (profileRes.ok) {
@@ -40,20 +48,20 @@ const MyRegistrations = () => {
                 }
 
                 setLoading(true);
-                const response = await fetch('http://localhost:5000/api/registrations/my-registrations', {
+                const response = await fetch(`${API_URL}/api/registrations/my-registrations`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (response.ok) {
                     const data = await response.json();
-                    const validRegs = data.filter(reg => reg.event && reg.event._id).map(reg => ({
-                        ...reg,
-                        event: {
-                            ...reg.event,
-                            image: reg.event.image ?
-                                (reg.event.image.startsWith('http') ? reg.event.image : `http://localhost:5000/uploads/${reg.event.image}`) :
-                                'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80'
-                        }
-                    }));
+                    const validRegs = data
+                        .filter(reg => reg.event && reg.event._id)
+                        .map(reg => ({
+                            ...reg,
+                            event: {
+                                ...reg.event,
+                                image: getSafeImageUrl(reg.event.image)
+                            }
+                        }));
                     setRegistrations(validRegs);
 
                     const now = new Date();
@@ -195,15 +203,24 @@ const MyRegistrations = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="myreg-card__footer">
+                                             <div className="myreg-card__footer">
                                                 <div className="myreg-price-box">
                                                     <span className="myreg-price-label">Ticket Price</span>
                                                     <span className="myreg-price-value">
                                                         {event.ticketPrice ? `₹${event.ticketPrice}` : 'Free'}
                                                     </span>
                                                 </div>
-                                                <div className="myreg-card__confirmed">
-                                                    <span style={{ fontSize: '10px' }}>●</span> CONFIRMED
+                                                <div className="myreg-card__confirmed" style={{
+                                                    color: reg.status === 'accepted' ? '#22c55e' : reg.status === 'rejected' ? '#ef4444' : '#ffab00',
+                                                    background: reg.status === 'accepted' ? 'rgba(34, 197, 94, 0.1)' : reg.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 171, 0, 0.1)',
+                                                    border: reg.status === 'accepted' ? '1px solid rgba(34, 197, 94, 0.2)' : reg.status === 'rejected' ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(255, 171, 0, 0.2)',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '4px',
+                                                    fontWeight: '700',
+                                                    fontSize: '11px'
+                                                }}>
+                                                    <span style={{ fontSize: '10px', marginRight: '4px' }}>●</span> 
+                                                    {reg.status?.toUpperCase() || 'PENDING'}
                                                 </div>
                                             </div>
 

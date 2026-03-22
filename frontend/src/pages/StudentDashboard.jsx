@@ -7,6 +7,16 @@ import EventCard from "../components/EventCard";
 import ProfileForm from "../components/ProfileForm";
 import "../styles/dashboard.css";
 import Chatbot from "../components/chatbot";
+import Calendar from "../components/Calendar";
+
+const API_URL = process.env.REACT_APP_API || 'http://localhost:5000';
+
+const getSafeImageUrl = (image) => {
+    const FALLBACK = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#a855f7"/></linearGradient></defs><rect fill="url(#g)" width="100%" height="100%"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="48">📅</text></svg>');
+    if (!image) return FALLBACK;
+    if (image.startsWith('http')) return image;
+    return `${API_URL}/uploads/${encodeURIComponent(image)}`;
+};
 
 export default function StudentDashboard() {
     const navigate = useNavigate();
@@ -29,7 +39,7 @@ export default function StudentDashboard() {
         const checkProfileStatus = async () => {
             if (!token) return;
             try {
-                const response = await fetch('http://localhost:5000/api/auth/profile/check', {
+                const response = await fetch(`${API_URL}/api/auth/profile/check`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -55,7 +65,7 @@ export default function StudentDashboard() {
         const fetchProfile = async () => {
             if (!token) return;
             try {
-                const response = await fetch('http://localhost:5000/api/auth/profile', {
+                const response = await fetch(`${API_URL}/api/auth/profile`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -77,28 +87,28 @@ export default function StudentDashboard() {
         const fetchRegistrations = async () => {
             if (!token) return;
             try {
-                const response = await fetch('http://localhost:5000/api/registrations/my-registrations', {
+                const response = await fetch(`${API_URL}/api/registrations/my-registrations`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                if (response.ok) {
-                    const data = await response.json();
-                    // Filter out registrations where the event was deleted
-                    const validRegistrations = data.filter(reg => reg.event && reg.event._id);
-                    setStudentRegistrations(validRegistrations);
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Filter out registrations where the event was deleted
+                        const validRegistrations = data.filter(reg => reg.event && reg.event._id);
+                        setStudentRegistrations(validRegistrations);
 
-                    // Calculate stats based on valid registrations only
-                    const nowDate = new Date();
-                    const upcoming = validRegistrations.filter(reg => new Date(reg.event?.eventDate) > nowDate).length;
-                    const completed = validRegistrations.filter(reg => new Date(reg.event?.eventDate) < nowDate).length;
+                        // Calculate stats based on valid registrations only
+                        const nowDate = new Date();
+                        const upcoming = validRegistrations.filter(reg => new Date(reg.event?.eventDate) > nowDate).length;
+                        const completed = validRegistrations.filter(reg => new Date(reg.event?.eventDate) < nowDate).length;
 
-                    setStats({
-                        totalRegistrations: validRegistrations.length,
-                        upcomingEvents: upcoming,
-                        completedEvents: completed
-                    });
-                }
+                        setStats({
+                            totalRegistrations: validRegistrations.length,
+                            upcomingEvents: upcoming,
+                            completedEvents: completed
+                        });
+                    }
             } catch (err) {
                 console.error('Error fetching registrations:', err);
             }
@@ -112,7 +122,7 @@ export default function StudentDashboard() {
         const fetchEvents = async () => {
             if (!token) return;
             try {
-                const response = await fetch('http://localhost:5000/api/events/all', {
+                const response = await fetch(`${API_URL}/api/events/all`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -121,9 +131,7 @@ export default function StudentDashboard() {
                     const data = await response.json();
                     const transformedEvents = data.slice(0, 3).map(ev => ({
                         ...ev,
-                        image: ev.image ?
-                            (ev.image.startsWith('http') ? ev.image : `http://localhost:5000/uploads/${ev.image}`) :
-                            'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80'
+                        image: getSafeImageUrl(ev.image)
                     }));
                     setFeaturedEvents(transformedEvents);
                 }
@@ -137,9 +145,18 @@ export default function StudentDashboard() {
         fetchEvents();
     }, [token]);
 
-    const handleProfileComplete = () => {
+    const handleProfileComplete = (updatedData) => {
         setProfileComplete(true);
         setShowProfileForm(false);
+        // Immediately update the displayed profile data so the dashboard reflects the new values
+        if (updatedData) {
+            setStudentProfile(prev => ({
+                ...prev,
+                ...updatedData,
+                // collegeName can come back as 'collegeName' from the form
+                college: updatedData.collegeName || updatedData.college || prev?.college,
+            }));
+        }
     };
 
     if (loading) {
@@ -183,7 +200,7 @@ export default function StudentDashboard() {
 
             <Sidebar role="student" isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
             <main className="main-content">
-                <Header userName={studentProfile?.name || user?.name || "Student"} userRole="Student" id={user?.id} />
+                <Header userName={studentProfile?.name || user?.name || "Student"} userRole="Student" id={user?.id} registrations={studentRegistrations} />
 
                 <div className="welcome-section">
                     <div style={{
@@ -346,11 +363,12 @@ export default function StudentDashboard() {
                                         backgroundImage: `url(${event.image})`,
                                         backgroundSize: 'cover',
                                         backgroundPosition: 'center',
-                                        backgroundColor: 'rgba(102,126,234,0.1)',
+                                        backgroundColor: 'rgba(102,126,234,0.15)',
+                                        backgroundRepeat: 'no-repeat',
                                         position: 'relative'
                                     }}>
                                         <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'rgba(102,126,234,0.9)', color: '#fff', fontSize: '11px', fontWeight: '700', padding: '3px 10px', borderRadius: '50px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                            {event.category || 'Tech'}
+                                            {({'tech':'💻 Technology','music':'🎵 Music','workshop':'🛠️ Workshop','cultural':'🎭 Cultural','sports':'⚽ Sports','other':'🌟 Other'})[event.category] || event.category || 'Tech'}
                                         </div>
                                     </div>
                                     <div style={{ padding: '16px' }}>
@@ -432,19 +450,34 @@ export default function StudentDashboard() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span style={{
-                                                background: isUpcoming ? 'rgba(16, 185, 129, 0.12)' : 'rgba(102,126,234,0.12)',
-                                                color: isUpcoming ? '#10b981' : '#667eea',
-                                                border: isUpcoming ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(102,126,234,0.25)',
-                                                padding: '6px 14px',
-                                                borderRadius: '50px',
-                                                fontSize: '12px',
-                                                fontWeight: '700',
-                                                whiteSpace: 'nowrap',
-                                                marginLeft: '16px'
-                                            }}>
-                                                {isUpcoming ? '🚀 Upcoming' : '✅ Completed'}
-                                            </span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', marginLeft: '16px' }}>
+                                                <span style={{
+                                                    background: registration.status === 'accepted' ? 'rgba(34, 197, 94, 0.12)' : registration.status === 'rejected' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(255, 171, 0, 0.12)',
+                                                    color: registration.status === 'accepted' ? '#22c55e' : registration.status === 'rejected' ? '#ef4444' : '#ffab00',
+                                                    border: registration.status === 'accepted' ? '1px solid rgba(34, 197, 94, 0.25)' : registration.status === 'rejected' ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(255, 171, 0, 0.25)',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '50px',
+                                                    fontSize: '11px',
+                                                    fontWeight: '800',
+                                                    whiteSpace: 'nowrap',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.02em'
+                                                }}>
+                                                    {registration.status === 'accepted' ? '● Accepted' : registration.status === 'rejected' ? '● Rejected' : '● Pending'}
+                                                </span>
+                                                <span style={{
+                                                    background: isUpcoming ? 'rgba(16, 185, 129, 0.12)' : 'rgba(102,126,234,0.12)',
+                                                    color: isUpcoming ? '#10b981' : '#667eea',
+                                                    border: isUpcoming ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(102,126,234,0.25)',
+                                                    padding: '4px 12px',
+                                                    borderRadius: '50px',
+                                                    fontSize: '11px',
+                                                    fontWeight: '700',
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    {isUpcoming ? '🚀 Upcoming' : '✅ Completed'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 );

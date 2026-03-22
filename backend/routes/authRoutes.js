@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, getMe, forgotPasswordSendOTP, forgotPasswordVerifyOTP, forgotPasswordResetPassword } = require('../controllers/authController');
+const { register, login, getMe, sendOTP, verifyOTP, resetPassword } = require('../controllers/authController');
 const { updateProfile, getProfile, checkProfileComplete } = require('../controllers/userController');
 const auth = require('../middleware/auth');
 
@@ -9,13 +9,18 @@ router.post('/login', login);
 router.get('/me', auth, getMe);
 
 // Password Recovery Routes (OTP-based)
-router.post('/forgot-password/send-otp', forgotPasswordSendOTP);
-router.post('/forgot-password/verify-otp', forgotPasswordVerifyOTP);
-router.post('/forgot-password/reset-password', forgotPasswordResetPassword);
+router.post('/forgot-password/send-otp', sendOTP);
+router.post('/forgot-password/verify-otp', verifyOTP);
+router.post('/forgot-password/reset-password', resetPassword);
 
 // User Profile Routes
 router.put('/profile/update', auth, updateProfile);
 router.get('/profile', auth, getProfile);
 router.get('/profile/check', auth, checkProfileComplete);
+
+// Forgot Password Routes
+router.post('/forgot-password/send-otp', sendOTP);
+router.post('/forgot-password/verify-otp', verifyOTP);
+router.post('/forgot-password/reset-password', resetPassword);
 
 module.exports = router;

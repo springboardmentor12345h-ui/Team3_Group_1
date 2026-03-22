@@ -4,19 +4,15 @@ const { saveFile } = require("../services/fileService");
 // Create Event with file upload
 exports.createEvent = async (req, res) => {
   try {
-    const { title, description, eventDate, location, registrationEndDate, ticketPrice, category } = req.body;
-
-    // Validate required fields
-    if (!title || !description || !eventDate || !location || !registrationEndDate) {
-      return res.status(400).json({ msg: 'Missing required fields' });
-    }
-
-    // Handle file upload if provided
-    let imageId = null;
-    if (req.file) {
-      const fileDoc = await saveFile(req.file, req.user.id, 'event', null);
-      imageId = fileDoc._id;
-    }
+    const {
+      title,
+      description,
+      eventDate,
+      location,
+      registrationEndDate,
+      ticketPrice,
+      category
+    } = req.body;
 
     const event = new Event({
       title,
@@ -24,10 +20,11 @@ exports.createEvent = async (req, res) => {
       eventDate,
       location,
       registrationEndDate,
-      ticketPrice: ticketPrice || null,
-      category: category || 'Other',
-      image: imageId,
-      admin: req.user.id
+      ticketPrice,
+      // Use the multer-uploaded file name, NOT req.body.image
+      image: req.file ? req.file.filename : null,
+      category,
+      admin: req.user?.id
     });
 
     await event.save();
@@ -39,6 +36,7 @@ exports.createEvent = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 // Get All Events
 exports.getAllEvents = async (req, res) => {

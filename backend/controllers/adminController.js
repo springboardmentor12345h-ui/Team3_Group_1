@@ -186,8 +186,8 @@ exports.createEvent = async (req, res) => {
       location,
       registrationEndDate,
       ticketPrice: ticketPrice || null,
-      category: category || 'Other',
-      image: imageId,
+      category: category || 'other',
+      image: req.file ? req.file.filename : null,
       admin: req.user.id
     });
 

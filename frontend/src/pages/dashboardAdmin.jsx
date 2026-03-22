@@ -3,7 +3,28 @@ import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import './AdminDashboard.css';
 import Chatbot from '../components/chatbot';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
+// Map raw DB category values to human-readable labels
+const CATEGORY_LABELS = {
+  tech: '💻 Technology',
+  music: '🎵 Music',
+  workshop: '🛠️ Workshop',
+  cultural: '🎭 Cultural',
+  sports: '⚽ Sports',
+  other: '🌟 Other',
+};
+
+const getCategoryLabel = (cat) => CATEGORY_LABELS[cat?.toLowerCase()] || cat || 'Other';
+
+const API_URL = process.env.REACT_APP_API || 'http://localhost:5000';
+
+const getSafeImageUrl = (image) => {
+  if (!image) return '';
+  if (image.startsWith('http')) return image;
+  return `${API_URL}/uploads/${encodeURIComponent(image)}`;
+};
 
 export default function AdminDashboard() {
   const { user, token, logout } = useContext(AuthContext);
@@ -15,13 +36,15 @@ export default function AdminDashboard() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [setShowReportModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [allRegistrations, setAllRegistrations] = useState([]);
+  const [newImagePreview, setNewImagePreview] = useState(null);
 
   // Form states
   const [eventForm, setEventForm] = useState({
@@ -36,8 +59,8 @@ export default function AdminDashboard() {
   });
 
   const [reportFilters, setReportFilters] = useState({
-    startDate: '2024-03-01',
-    endDate: '2024-03-31',
+    startDate: '2024-01-01',
+    endDate: '2030-12-31',
     eventType: 'all',
     format: 'pdf'
   });
@@ -52,7 +75,7 @@ export default function AdminDashboard() {
 
       // Fetch events
       const eventsResponse = await fetch(
-        "http://localhost:5000/api/dashboard/admin/events",
+        `${API_URL}/api/dashboard/admin/events`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -66,7 +89,7 @@ export default function AdminDashboard() {
       let totalRegistrations = 0;
       try {
         const registrationsResponse = await fetch(
-          "http://localhost:5000/api/registrations/admin/all",
+          `${API_URL}/api/registrations/admin/all`,
           {
             headers: {
               Authorization: `Bearer ${token}`
@@ -76,41 +99,70 @@ export default function AdminDashboard() {
         if (registrationsResponse.ok) {
           participants = await registrationsResponse.json();
           totalRegistrations = participants.length;
+          setAllRegistrations(participants);
         }
       } catch (regErr) {
         console.log('Could not fetch registrations:', regErr);
       }
 
       // Transform participants to user format
-      const uniqueUsers = Array.from(
-        new Map(
-          participants.map(p => [
-            p.email,
-            {
-              id: p._id || p.email,
-              name: p.firstName ? `${p.firstName} ${p.lastName}` : p.name,
-              email: p.email,
-              role: 'student',
-              events: 1,
-              joined: p.createdAt,
-              status: p.status
-            }
-          ])
-        ).values()
-      );
+      // const uniqueUsers = Array.from(
+      //   new Map(
+      //     participants.map(p => [
+      //       p.email,
+      //       {
+      //         id: p._id || p.email,
+      //         name: p.firstName ? `${p.firstName} ${p.lastName}` : p.name,
+      //         email: p.email,
+      //         role: 'student',
+      //         events: 1,
+      //         joined: p.createdAt,
+      //         status: p.status
+      //       }
+      //     ])
+      //   ).values()
+      // );
+      const registrationUsers = participants.map(p => ({
+        id: p._id,
+        name: `${p.firstName} ${p.lastName}`,
+        email: p.email,
+        role: "student",
+        events: p.event?.title,
+        joined: p.createdAt,
+        status: p.status
+      }));
+
+
+      // Filter out cancelled registrations for stats accuracy
+      const activeRegistrations = participants.filter(p => p.status !== 'cancelled');
+      const totalActiveRegistrations = activeRegistrations.length;
+
+      // Enrich events with registration data
+      const enrichedEvents = events.map(event => {
+        const eventRegistrations = activeRegistrations.filter(p =>
+          (p.event?._id || p.event) === event._id
+        );
+        const registeredCount = eventRegistrations.length;
+        const revenueAmount = registeredCount * (event.ticketPrice || 0);
+        return {
+          ...event,
+          category: (event.category || 'other').toLowerCase(),
+          registered: registeredCount,
+          revenue: revenueAmount
+        };
+      });
+
+      const totalRevenueValue = enrichedEvents.reduce((sum, e) => sum + e.revenue, 0);
 
       setStats({
-        totalEvents: events.length,
-        activeEvents: events.filter(e => e.status === 'active').length,
-        totalRegistrations: totalRegistrations,
-        avgParticipants: events.length > 0 ? Math.round(totalRegistrations / events.length) : 0,
-        totalRevenue: events.reduce(
-          (sum, event) => totalRegistrations * (event.ticketPrice),
-          0
-        ),
+        totalEvents: enrichedEvents.length,
+        activeEvents: enrichedEvents.filter(e => e.status === 'active').length,
+        totalRegistrations: totalActiveRegistrations,
+        avgParticipants: enrichedEvents.length > 0 ? Math.round(totalActiveRegistrations / enrichedEvents.length) : 0,
+        totalRevenue: totalRevenueValue,
         growth: 0,
-        events: events,
-        users: uniqueUsers,
+        events: enrichedEvents,
+        users: registrationUsers,
         recentActivity: []
       });
       setLoading(false);
@@ -124,13 +176,34 @@ export default function AdminDashboard() {
 
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
-    setNotifications([
-      { id: 1, type: 'event', message: 'Tech Conference starts in 2 days', read: false, time: '5 min ago' },
-      { id: 2, type: 'user', message: 'New user registered: Sarah Johnson', read: false, time: '1 hour ago' },
-      { id: 3, type: 'payment', message: 'Payment received: $500 from Event Corp', read: false, time: '3 hours ago' },
-      { id: 4, type: 'alert', message: 'Event capacity reached: Music Festival', read: true, time: '1 day ago' },
-    ]);
-  }, []);
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/notifications`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const formatTimeAgo = (date) => {
+          const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+          if (seconds < 60) return 'just now';
+          const minutes = Math.floor(seconds / 60);
+          if (minutes < 60) return `${minutes}m ago`;
+          const hours = Math.floor(minutes / 60);
+          if (hours < 24) return `${hours}h ago`;
+          return `${Math.floor(hours / 24)}d ago`;
+        };
+        setNotifications(data.map(n => ({
+          id: n._id,
+          type: n.type || 'alert',
+          message: n.message,
+          read: n.isRead,
+          time: formatTimeAgo(n.createdAt),
+        })));
+      }
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    }
+  }, [token]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -166,7 +239,7 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(
-        'http://localhost:5000/api/dashboard/create-event',
+        `${API_URL}/api/dashboard/create-event`,
         {
           method: 'POST',
           headers: {
@@ -211,33 +284,43 @@ export default function AdminDashboard() {
     e.preventDefault();
 
     try {
+      // Use FormData so we can optionally include a new image file
       const formData = new FormData();
       formData.append('title', eventForm.title);
       formData.append('description', eventForm.description);
       formData.append('eventDate', new Date(eventForm.eventDate + 'T00:00:00').toISOString());
       formData.append('location', eventForm.location);
       formData.append('registrationEndDate', new Date(eventForm.registrationEndDate + 'T23:59:59').toISOString());
-      formData.append('ticketPrice', eventForm.ticketPrice || 0);
+      formData.append('ticketPrice', Number(eventForm.ticketPrice) || 0);
+      formData.append('category', eventForm.category || 'other');
 
-      const response = await fetch(`http://localhost:5000/api/events/${eventForm._id}`, {
+      // If user wants to remove the image entirely
+      if (eventForm.removeImage) {
+        formData.append('removeImage', 'true');
+      }
+
+      // Only attach a new image if the user picked one
+      if (eventForm.newImage) {
+        formData.append('image', eventForm.newImage);
+      }
+
+      const response = await fetch(`${API_URL}/api/dashboard/admin/events/${eventForm._id}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`
+          // NOTE: Do NOT set Content-Type here — browser sets it automatically with the correct multipart boundary
         },
-        body: JSON.stringify({
-          title: eventForm.title,
-          description: eventForm.description,
-          eventDate: new Date(eventForm.eventDate + 'T00:00:00').toISOString(),
-          location: eventForm.location,
-          registrationEndDate: new Date(eventForm.registrationEndDate + 'T23:59:59').toISOString(),
-          ticketPrice: Number(eventForm.ticketPrice) || 0
-        })
+        body: formData
       });
 
       if (response.ok) {
         alert('Event updated successfully!');
         setShowEditModal(false);
+        // Cleanup preview URL
+        if (newImagePreview) {
+          URL.revokeObjectURL(newImagePreview);
+          setNewImagePreview(null);
+        }
         fetchDashboardData();
       } else {
         const error = await response.text();
@@ -254,7 +337,7 @@ export default function AdminDashboard() {
     if (window.confirm('Are you sure you want to delete this event?')) {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/dashboard/admin/events/${eventId}`,
+          `${API_URL}/api/dashboard/admin/events/${eventId}`,
           {
             method: 'DELETE',
             headers: {
@@ -265,7 +348,7 @@ export default function AdminDashboard() {
 
         if (response.ok) {
           alert('Event deleted successfully!');
-          fetchDashboardData(); 
+          fetchDashboardData();
         } else {
           alert('Failed to delete event');
         }
@@ -284,64 +367,198 @@ export default function AdminDashboard() {
       alert(`Role changed for ${user.name}`);
     }
   };
+  const acceptRegistration = async (id) => {
+    try {
+      const res = await fetch(
+        `${API_URL}/api/registrations/accept/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-  // Handle report generation
+      if (res.ok) {
+        alert("Registration Accepted");
+        fetchDashboardData(); // refresh table
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const rejectRegistration = async (id) => {
+    try {
+      const res = await fetch(
+        `${API_URL}/api/registrations/reject/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (res.ok) {
+        alert("Registration Rejected");
+        fetchDashboardData();
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
   const handleGenerateReport = () => {
     if (!stats?.events) {
       alert('No data available to generate report');
       return;
     }
 
-    // Filter events by date range
     const filteredEvents = stats.events.filter(event => {
       const eventDate = new Date(event.eventDate);
       const startDate = new Date(reportFilters.startDate);
       const endDate = new Date(reportFilters.endDate);
-      return eventDate >= startDate && eventDate <= endDate;
+      endDate.setHours(23, 59, 59, 999);
+
+      const isInDateRange = eventDate >= startDate && eventDate <= endDate;
+      const isTypeMatch = reportFilters.eventType === 'all' || event.category === reportFilters.eventType;
+
+      return isInDateRange && isTypeMatch;
     });
 
     if (filteredEvents.length === 0) {
-      alert('No events in the selected date range');
+      alert('No events found for the selected filters');
       return;
     }
 
-    // Prepare report data
     const totalReg = filteredEvents.reduce((sum, e) => sum + (e.registered || 0), 0);
     const totalRev = filteredEvents.reduce((sum, e) => sum + (e.revenue || 0), 0);
-    const avgConversion = Math.round(
-      (totalReg / filteredEvents.reduce((sum, e) => sum + (e.capacity || 1), 0)) * 100
+    const filteredEventIds = filteredEvents.map(e => e._id);
+    const relevantRegistrations = allRegistrations.filter(reg =>
+      reg.event && filteredEventIds.includes(reg.event._id || reg.event)
     );
 
     if (reportFilters.format === 'csv') {
-      // Generate CSV
-      const headers = ['Event Name', 'Date', 'Location', 'Registrations', 'Capacity', 'Revenue', 'Conversion Rate'];
-      const rows = filteredEvents.map(event => [
-        event.title,
-        new Date(event.eventDate).toLocaleDateString(),
-        event.location,
-        event.registered || 0,
-        event.capacity || 0,
-        event.revenue || 0,
-        event.capacity ? Math.round(((event.registered || 0) / event.capacity) * 100) + '%' : '0%'
+      // Professional Comprehensive CSV
+      const headers = [
+        'No.',
+        'First Name',
+        'Last Name',
+        'Email',
+        'Phone',
+        'College',
+        'Department',
+        'Year',
+        'City',
+        'Gender',
+        'Event Title',
+        'Event Date',
+        'Registration Status',
+        'Registered At'
+      ];
+
+      const rows = relevantRegistrations.map((reg, index) => [
+        index + 1,
+        reg.firstName || 'N/A',
+        reg.lastName || 'N/A',
+        reg.email || 'N/A',
+        reg.phone || 'N/A',
+        reg.college || 'N/A',
+        reg.department || 'N/A',
+        reg.year || 'N/A',
+        reg.city || 'N/A',
+        reg.gender || 'N/A',
+        reg.event?.title || 'Unknown Event',
+        reg.event?.eventDate ? new Date(reg.event.eventDate).toLocaleDateString() : 'N/A',
+        reg.status || 'pending',
+        reg.createdAt ? new Date(reg.createdAt).toLocaleString() : 'N/A'
       ]);
 
-      let csv = headers.join(',') + '\n';
-      csv += rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-      csv += '\n\nSUMMARY\n';
+      let csv = `Event Registrations Report\n`;
+      csv += `Generated on,${new Date().toLocaleString()}\n`;
+      csv += `Date Range,${reportFilters.startDate} to ${reportFilters.endDate}\n`;
+      csv += `Category,${reportFilters.eventType}\n\n`;
+
+      csv += `SUMMARY\n`;
       csv += `Total Events,${filteredEvents.length}\n`;
       csv += `Total Registrations,${totalReg}\n`;
-      csv += `Total Revenue,$${totalRev.toLocaleString()}\n`;
-      csv += `Average Conversion Rate,${avgConversion}%\n`;
+      csv += `Total Revenue,$${totalRev.toLocaleString()}\n\n`;
 
-      const blob = new Blob([csv], { type: 'text/csv' });
+      csv += headers.join(',') + '\n';
+      csv += rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = `event_report_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('href', url);
+      link.setAttribute('download', `comprehensive_report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } else {
-      alert(`${reportFilters.format.toUpperCase()} report generation not yet implemented. CSV export is available.`);
+      // Professional Landscape PDF for more columns
+      const doc = new jsPDF('l', 'mm', 'a4');
+
+      doc.setFontSize(22);
+      doc.setTextColor(63, 81, 181);
+      doc.text('Comprehensive Event Registrations Report', 14, 22);
+
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Generated: ${new Date().toLocaleString()} | Filter: ${reportFilters.startDate} to ${reportFilters.endDate}`, 14, 30);
+
+      doc.setDrawColor(200);
+      doc.line(14, 34, 282, 34);
+
+      doc.setFontSize(12);
+      doc.setTextColor(0);
+      doc.text('KEY METRICS', 14, 42);
+
+      doc.setFontSize(10);
+      doc.text(`Total Events: ${filteredEvents.length}`, 14, 48);
+      doc.text(`Total Registrations: ${totalReg}`, 60, 48);
+      doc.text(`Total Revenue: $${totalRev.toLocaleString()}`, 110, 48);
+
+      const tableColumn = [
+        "No.", "Name", "Email", "Phone", "College/Dept", "Year", "Event", "Status", "Date"
+      ];
+
+      const tableRows = relevantRegistrations.map((reg, index) => [
+        index + 1,
+        `${reg.firstName || ''} ${reg.lastName || ''}`,
+        reg.email || 'N/A',
+        reg.phone || 'N/A',
+        `${reg.college || 'N/A'}${reg.department ? ' / ' + reg.department : ''}`,
+        reg.year || 'N/A',
+        reg.event?.title || 'Unknown',
+        reg.status?.toUpperCase() || 'PENDING',
+        reg.createdAt ? new Date(reg.createdAt).toLocaleDateString() : 'N/A'
+      ]);
+
+      autoTable(doc, {
+        startY: 55,
+        head: [tableColumn],
+        body: tableRows,
+        theme: 'striped',
+        headStyles: { fillColor: [63, 81, 181], fontSize: 9, cellPadding: 2 },
+        bodyStyles: { fontSize: 8, cellPadding: 2 },
+        alternateRowStyles: { fillColor: [245, 247, 255] },
+        margin: { left: 14, right: 14 },
+        columnStyles: {
+          0: { cellWidth: 10 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 45 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 50 },
+          5: { cellWidth: 15 },
+          6: { cellWidth: 40 },
+          7: { cellWidth: 20 },
+          8: { cellWidth: 20 }
+        }
+      });
+
+      doc.save(`comprehensive_report_${new Date().toISOString().split('T')[0]}.pdf`);
     }
   };
 
@@ -569,11 +786,13 @@ export default function AdminDashboard() {
                       className="search-input"
                     />
                     <select className="filter-select">
-                      <option>All Categories</option>
-                      <option>Technology</option>
-                      <option>Music</option>
-                      <option>Education</option>
-                      <option>Networking</option>
+                      <option value="">All Categories</option>
+                      <option value="tech">💻 Technology</option>
+                      <option value="music">🎵 Music</option>
+                      <option value="workshop">🛠️ Workshop</option>
+                      <option value="cultural">🎭 Cultural</option>
+                      <option value="sports">⚽ Sports</option>
+                      <option value="other">🌟 Other</option>
                     </select>
                     <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
                       + New Event
@@ -599,10 +818,23 @@ export default function AdminDashboard() {
                         <tr key={event._id}>
                           <td>
                             <div className="event-cell">
-                              <img
-                                src={`http://localhost:5000/uploads/${event.image}`}
-                                alt={event.title}
-                              />
+                              {event.image ? (
+                                <img
+                                  src={getSafeImageUrl(event.image)}
+                                  alt={event.title}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextElementSibling.style.display = 'flex';
+                                  }}
+                                />
+                              ) : null}
+                              <div style={{
+                                display: event.image ? 'none' : 'flex',
+                                width: '40px', height: '40px', borderRadius: '8px',
+                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                alignItems: 'center', justifyContent: 'center',
+                                fontSize: '18px', flexShrink: 0
+                              }}>📅</div>
                               <span>{event.title}</span>
                             </div>
                           </td>
@@ -719,8 +951,50 @@ export default function AdminDashboard() {
                           <td>{user.events}</td>
                           <td>{new Date(user.joined).toLocaleDateString()}</td>
                           <td>
-                            <button className="action-btn" onClick={() => handleUserAction('edit', user)}>✏️</button>
-                            <button className="action-btn" onClick={() => handleUserAction('delete', user)}>🗑️</button>
+                            {user.status === 'pending' || !user.status ? (
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                  onClick={() => acceptRegistration(user.id)}
+                                  style={{
+                                    background: "#22c55e",
+                                    color: "white",
+                                    border: "none",
+                                    padding: "5px 10px",
+                                    borderRadius: "5px",
+                                    cursor: "pointer"
+                                  }}
+                                >
+                                  Accept
+                                </button>
+
+                                <button
+                                  onClick={() => rejectRegistration(user.id)}
+                                  style={{
+                                    background: "#ef4444",
+                                    color: "white",
+                                    border: "none",
+                                    padding: "5px 10px",
+                                    borderRadius: "5px",
+                                    cursor: "pointer"
+                                  }}
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span className={`status-badge ${user.status}`} style={{
+                                padding: '4px 12px',
+                                borderRadius: '50px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                textTransform: 'capitalize',
+                                backgroundColor: user.status === 'accepted' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                color: user.status === 'accepted' ? '#22c55e' : '#ef4444',
+                                border: user.status === 'accepted' ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(239, 68, 68, 0.2)'
+                              }}>
+                                {user.status}
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -811,11 +1085,12 @@ export default function AdminDashboard() {
                       onChange={(e) => setReportFilters({ ...reportFilters, eventType: e.target.value })}
                     >
                       <option value="all">All Events</option>
-                      <option value="tech">Technology</option>
-                      <option value="music">Music</option>
-                      <option value="workshop">Workshops</option>
-                      <option value="networking">Networking</option>
-                      <option value="charity">Charity</option>
+                      <option value="tech">💻 Technology</option>
+                      <option value="music">🎵 Music</option>
+                      <option value="workshop">🛠️ Workshop</option>
+                      <option value="cultural">🎭 Cultural</option>
+                      <option value="sports">⚽ Sports</option>
+                      <option value="other">🌟 Other</option>
                     </select>
                   </div>
 
@@ -895,7 +1170,12 @@ export default function AdminDashboard() {
                             const eventDate = new Date(event.eventDate);
                             const startDate = new Date(reportFilters.startDate);
                             const endDate = new Date(reportFilters.endDate);
-                            return eventDate >= startDate && eventDate <= endDate;
+                            endDate.setHours(23, 59, 59, 999);
+
+                            const isInDateRange = eventDate >= startDate && eventDate <= endDate;
+                            const isTypeMatch = reportFilters.eventType === 'all' || event.category === reportFilters.eventType;
+
+                            return isInDateRange && isTypeMatch;
                           })
                           .map(e => `${e.title},${new Date(e.eventDate).toLocaleDateString()},${e.registered}/${e.capacity},${e.revenue || 0},${Math.round((e.registered / (e.capacity || 1)) * 100)}%`)
                           .join('\n');
@@ -927,8 +1207,12 @@ export default function AdminDashboard() {
                           const eventDate = new Date(event.eventDate);
                           const startDate = new Date(reportFilters.startDate);
                           const endDate = new Date(reportFilters.endDate);
+                          endDate.setHours(23, 59, 59, 999);
+
                           const isInDateRange = eventDate >= startDate && eventDate <= endDate;
-                          return isInDateRange;
+                          const isTypeMatch = reportFilters.eventType === 'all' || event.category === reportFilters.eventType;
+
+                          return isInDateRange && isTypeMatch;
                         })
                         .map(event => (
                           <tr key={event._id}>
@@ -1049,11 +1333,12 @@ export default function AdminDashboard() {
               </div>
 
               <div className="form-group">
-                <label>Event Image</label>
+                <label>Event Image *</label>
                 <div className="image-upload-container">
                   <input
                     type="file"
                     accept="image/*"
+                    required
                     onChange={(e) => {
                       const file = e.target.files[0];
                       if (file) {
@@ -1084,9 +1369,9 @@ export default function AdminDashboard() {
 
       {/* Edit Event Modal */}
       {showEditModal && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+        <div className="modal-overlay" onClick={() => { setShowEditModal(false); if (newImagePreview) { URL.revokeObjectURL(newImagePreview); setNewImagePreview(null); } }}>
           <div className="modal-content edit-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setShowEditModal(false)}>×</button>
+            <button className="modal-close" onClick={() => { setShowEditModal(false); if (newImagePreview) { URL.revokeObjectURL(newImagePreview); setNewImagePreview(null); } }}>×</button>
             <h2>Edit Event</h2>
 
             <form onSubmit={handleUpdateEvent} className="modal-form">
@@ -1156,6 +1441,109 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              <div className="form-group">
+                <label>Category *</label>
+                <select
+                  value={eventForm.category || 'other'}
+                  onChange={(e) => setEventForm({ ...eventForm, category: e.target.value })}
+                  required
+                >
+                  <option value="tech">💻 Technology</option>
+                  <option value="music">🎵 Music</option>
+                  <option value="workshop">🛠️ Workshop</option>
+                  <option value="cultural">🎭 Cultural</option>
+                  <option value="sports">⚽ Sports</option>
+                  <option value="other">🌟 Other</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Event Image</label>
+
+                {/* ── Current image (shown only when no new image is chosen and not removed) ── */}
+                {(eventForm.image && !eventForm.removeImage && !newImagePreview) && (
+                  <div className="edit-img-current">
+                    <img
+                      src={getSafeImageUrl(eventForm.image)}
+                      alt="Current event"
+                      className="edit-img-thumb"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                    <div className="edit-img-info">
+                      <span className="edit-img-label">Current image</span>
+                      <button
+                        type="button"
+                        className="edit-img-remove-btn"
+                        onClick={() => setEventForm({ ...eventForm, removeImage: true, newImage: null })}
+                      >
+                        🗑️ Remove image
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Removed state ── */}
+                {eventForm.removeImage && !newImagePreview && (
+                  <div className="edit-img-removed">
+                    <span>🚫 Image will be removed on save.</span>
+                    <button
+                      type="button"
+                      className="edit-img-undo-btn"
+                      onClick={() => setEventForm({ ...eventForm, removeImage: false })}
+                    >
+                      ↩ Undo
+                    </button>
+                  </div>
+                )}
+
+                {/* ── New-image live preview ── */}
+                {newImagePreview && (
+                  <div className="edit-img-preview-wrap">
+                    <img
+                      src={newImagePreview}
+                      alt="New image preview"
+                      className="edit-img-preview"
+                    />
+                    <div className="edit-img-preview-overlay">
+                      <span className="edit-img-new-badge">New image</span>
+                      <button
+                        type="button"
+                        className="edit-img-remove-btn"
+                        onClick={() => {
+                          URL.revokeObjectURL(newImagePreview);
+                          setNewImagePreview(null);
+                          setEventForm({ ...eventForm, newImage: null });
+                        }}
+                      >
+                        ✕ Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Upload / replace button ── */}
+                <label className="edit-img-upload-label" htmlFor="edit-image-input">
+                  <span>📷</span>
+                  {newImagePreview ? 'Choose a different image' : (eventForm.image && !eventForm.removeImage) ? 'Replace image' : 'Upload image'}
+                  <input
+                    id="edit-image-input"
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      // Revoke old object URL if any
+                      if (newImagePreview) URL.revokeObjectURL(newImagePreview);
+                      const preview = URL.createObjectURL(file);
+                      setNewImagePreview(preview);
+                      setEventForm({ ...eventForm, newImage: file, removeImage: false });
+                    }}
+                  />
+                </label>
+                <p className="image-upload-hint">Supported formats: JPG, PNG, GIF · Max 5 MB · Leave unchanged to keep current image</p>
+              </div>
+
               <div className="form-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowEditModal(false)}>
                   Cancel
@@ -1176,9 +1564,10 @@ export default function AdminDashboard() {
             <button className="modal-close" onClick={() => setSelectedEvent(null)}>×</button>
 
             <img
-              src={`http://localhost:5000/uploads/${selectedEvent.image}`}
+              src={getSafeImageUrl(selectedEvent.image)}
               alt={selectedEvent.title}
               className="modal-image"
+              onError={(e) => { e.target.style.display = 'none'; }}
             />
 
             <div className="modal-details">
@@ -1187,7 +1576,7 @@ export default function AdminDashboard() {
               <div className="event-meta">
                 <span>📅 {new Date(selectedEvent.eventDate).toLocaleDateString()}</span>
                 <span>📍 {selectedEvent.location}</span>
-                <span>🏷️ {selectedEvent.category}</span>
+                <span>🏷️ {getCategoryLabel(selectedEvent.category)}</span>
               </div>
 
               <p className="event-description">{selectedEvent.description}</p>
@@ -1227,6 +1616,85 @@ export default function AdminDashboard() {
                   Edit Event
                 </button>
                 <button className="btn-secondary">View Registrations</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="modal-overlay" onClick={() => setShowReportModal(false)}>
+          <div className="modal-content report-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowReportModal(false)}>×</button>
+            <h2>Export Event Report</h2>
+
+            <div className="modal-form">
+              <div className="form-group">
+                <label>Date Range</label>
+                <div className="form-row">
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.7rem', opacity: 0.7 }}>From</label>
+                    <input
+                      type="date"
+                      value={reportFilters.startDate}
+                      onChange={(e) => setReportFilters({ ...reportFilters, startDate: e.target.value })}
+                      className="date-input"
+                    />
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.7rem', opacity: 0.7 }}>To</label>
+                    <input
+                      type="date"
+                      value={reportFilters.endDate}
+                      onChange={(e) => setReportFilters({ ...reportFilters, endDate: e.target.value })}
+                      className="date-input"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Event Category</label>
+                <select
+                  value={reportFilters.eventType}
+                  onChange={(e) => setReportFilters({ ...reportFilters, eventType: e.target.value })}
+                  className="filter-select"
+                  style={{ width: '100%', padding: '0.6rem' }}
+                >
+                  <option value="all">All Categories</option>
+                  <option value="tech">💻 Technology</option>
+                  <option value="music">🎵 Music</option>
+                  <option value="workshop">🛠️ Workshop</option>
+                  <option value="cultural">🎭 Cultural</option>
+                  <option value="sports">⚽ Sports</option>
+                  <option value="other">🌟 Other</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Export Format</label>
+                <select
+                  value={reportFilters.format}
+                  onChange={(e) => setReportFilters({ ...reportFilters, format: e.target.value })}
+                  className="filter-select"
+                  style={{ width: '100%', padding: '0.6rem' }}
+                >
+                  <option value="pdf">PDF Document</option>
+                  <option value="csv">CSV File</option>
+                </select>
+              </div>
+
+              <div className="form-actions" style={{ marginTop: '1.5rem' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowReportModal(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="btn-primary" onClick={() => {
+                  handleGenerateReport();
+                  setShowReportModal(false);
+                }}>
+                  Generate Report
+                </button>
               </div>
             </div>
           </div>
@@ -1301,16 +1769,21 @@ function StatCard({ title, value, icon, trend, trendType = 'positive', onClick }
 
 // Event Card Component
 function EventCard({ event, onClick, onEdit }) {
+  const imageUrl = getSafeImageUrl(event.image);
+
   return (
     <div className="event-card" onClick={onClick}>
       <div className="event-image-container">
         <img
-          src={`http://localhost:5000/uploads/${event.image}`}
+          src={imageUrl || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22%3E%3Crect fill=%22%236366f1%22 width=%22100%25%22 height=%22100%25%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2248%22%3E%F0%9F%93%85%3C/text%3E%3C/svg%3E'}
           alt={event.title}
           className="event-image"
+          onError={(e) => {
+            e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22%3E%3Crect fill=%22%236366f1%22 width=%22100%25%22 height=%22100%25%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2248%22%3E%F0%9F%93%85%3C/text%3E%3C/svg%3E';
+          }}
         />
         <span className={`event-status ${event.status}`}>{event.status}</span>
-        <span className="event-category">{event.category}</span>
+        <span className="event-category">{getCategoryLabel(event.category)}</span>
       </div>
 
       <div className="event-details">
