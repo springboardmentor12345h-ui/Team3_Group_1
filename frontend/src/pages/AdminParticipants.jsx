@@ -11,10 +11,16 @@ export default function AdminDashboard() {
     const navigate = useNavigate();
     const { user, token } = useContext(AuthContext);
     const [loading, setLoading] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    
+    const toggleSidebar = React.useCallback(() => setSidebarOpen(true), []);
+    const closeSidebar = React.useCallback(() => setSidebarOpen(false), []);
+
     const [adminEvents, setAdminEvents] = useState([]);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [registrations, setRegistrations] = useState([]);
     const [loadingRegistrations, setLoadingRegistrations] = useState(false);
+    const [selectedFeedback, setSelectedFeedback] = useState(null);
 
     // Fetch admin's events
     useEffect(() => {
@@ -77,8 +83,9 @@ export default function AdminDashboard() {
     if (loading) {
         return (
             <div className="dashboard-container">
-                <Sidebar role="admin" />
+                <Sidebar role="admin" isOpen={sidebarOpen} onClose={closeSidebar} />
                 <main className="main-content">
+                    <Header userName={user?.name || "Admin"} userRole="Admin" onToggle={toggleSidebar} />
                     <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>
                 </main>
             </div>
@@ -87,9 +94,14 @@ export default function AdminDashboard() {
 
     return (
         <div className="dashboard-container">
-            <Sidebar role="admin" />
+            <Sidebar role="admin" isOpen={sidebarOpen} onClose={closeSidebar} />
             <main className="main-content">
-                <Header userName={user?.name || "Admin"} userRole="Admin" id={user?.id} />
+                <Header 
+                    userName={user?.name || "Admin"} 
+                    userRole="Admin" 
+                    id={user?.id} 
+                    onToggle={toggleSidebar}
+                />
 
                 <div className="admin-section">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -227,6 +239,8 @@ export default function AdminDashboard() {
                                                         <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Year</th>
                                                         <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>College</th>
                                                         <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Status</th>
+                                                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', minWidth: '100px' }}>Rating</th>
+                                                        <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: '600', minWidth: '120px' }}>Feedback</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -258,8 +272,8 @@ export default function AdminDashboard() {
                                                             </td>
                                                             <td style={{ padding: '12px 16px', fontSize: '14px' }}>
                                                                 <span style={{
-                                                                    background: reg.status === 'attended' ? '#d1fae5' : '#dbeafe',
-                                                                    color: reg.status === 'attended' ? '#065f46' : '#0c4a6e',
+                                                                    background: reg.status === 'attended' ? '#d1fae5' : reg.status === 'accepted' ? '#dbeafe' : reg.status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                                                                    color: reg.status === 'attended' ? '#065f46' : reg.status === 'accepted' ? '#1e40af' : reg.status === 'rejected' ? '#991b1b' : '#92400e',
                                                                     padding: '4px 8px',
                                                                     borderRadius: '4px',
                                                                     fontSize: '12px',
@@ -267,6 +281,27 @@ export default function AdminDashboard() {
                                                                 }}>
                                                                     {reg.status?.charAt(0).toUpperCase() + reg.status?.slice(1)}
                                                                 </span>
+                                                            </td>
+                                                            <td style={{ padding: '12px 16px', fontSize: '14px', color: '#6F767E' }}>
+                                                                {reg.rating ? (
+                                                                    <span style={{ color: '#fbbf24', letterSpacing: '1px' }}>
+                                                                        {"★".repeat(reg.rating)}{"☆".repeat(5-reg.rating)}
+                                                                    </span>
+                                                                ) : '-'}
+                                                            </td>
+                                                            <td style={{ padding: '12px 16px', fontSize: '13px', textAlign: 'center' }}>
+                                                                {reg.rating && reg.feedback ? (
+                                                                    <button 
+                                                                        onClick={() => setSelectedFeedback({...reg.feedback, rating: reg.rating, userName: `${reg.firstName} ${reg.lastName}`})}
+                                                                        style={{
+                                                                            background: 'var(--primary)', color: 'white', border: 'none', 
+                                                                            padding: '6px 12px', borderRadius: '4px', cursor: 'pointer',
+                                                                            fontSize: '12px', fontWeight: '600'
+                                                                        }}
+                                                                    >
+                                                                        View Feedback
+                                                                    </button>
+                                                                ) : '-'}
                                                             </td>
                                                         </tr>
                                                     ))}
@@ -289,6 +324,61 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 </div>
+
+                {/* Feedback Modal */}
+                {selectedFeedback && (
+                    <div className="feedback-modal-overlay" style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+                        background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', 
+                        alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)'
+                    }}>
+                        <div className="feedback-modal-content" style={{
+                            background: 'white', width: '90%', maxWidth: '500px', 
+                            borderRadius: '16px', padding: '32px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+                            maxHeight: '80vh', overflowY: 'auto'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h2 style={{ fontSize: '20px', fontWeight: '700', margin: 0, color: '#0f172a' }}>
+                                    Feedback from {selectedFeedback.userName}
+                                </h2>
+                                <button 
+                                    onClick={() => setSelectedFeedback(null)}
+                                    style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div style={{ marginBottom: '24px' }}>
+                                <div style={{ fontSize: '13px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '8px' }}>Overall Rating</div>
+                                <div style={{ fontSize: '24px', color: '#fbbf24', letterSpacing: '2px' }}>
+                                    {"★".repeat(selectedFeedback.rating)}{"☆".repeat(5-selectedFeedback.rating)}
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: '24px' }}>
+                                <div style={{ fontSize: '13px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '8px' }}>Event Experience</div>
+                                <div style={{ fontSize: '15px', color: '#334155', lineHeight: '1.5', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    {selectedFeedback.eventExperience || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>No response provided.</span>}
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: '24px' }}>
+                                <div style={{ fontSize: '13px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '8px' }}>Areas of Dissatisfaction</div>
+                                <div style={{ fontSize: '15px', color: '#334155', lineHeight: '1.5', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    {selectedFeedback.dissatisfactions || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>No response provided.</span>}
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: '24px' }}>
+                                <div style={{ fontSize: '13px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '8px' }}>Suggestions for Improvement</div>
+                                <div style={{ fontSize: '15px', color: '#334155', lineHeight: '1.5', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    {selectedFeedback.improvements || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>No response provided.</span>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );

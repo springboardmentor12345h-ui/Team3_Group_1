@@ -1,9 +1,9 @@
 const Registration = require('../models/Registration');
 const Event = require('../models/Event');
 const sendEmail = require('../utils/sendemail');
-const { 
-  getRegistrationConfirmationEmail, 
-  getRegistrationAcceptedEmail, 
+const {
+  getRegistrationConfirmationEmail,
+  getRegistrationAcceptedEmail,
   getRegistrationRejectedEmail,
   getAdminRegistrationAlertEmail
 } = require('../utils/emailTemplates');
@@ -46,9 +46,9 @@ exports.registerForEvent = async (req, res) => {
         existingRegistration.status = 'pending';
         // You might want to update other fields if they were changed
         await existingRegistration.save();
-        return res.status(200).json({ 
-          msg: "Registration re-submitted for approval", 
-          registration: existingRegistration 
+        return res.status(200).json({
+          msg: "Registration re-submitted for approval",
+          registration: existingRegistration
         });
       }
       return res.status(400).json({ msg: "You are already registered for this event" });
@@ -103,14 +103,18 @@ exports.registerForEvent = async (req, res) => {
         message: `${firstName} ${lastName} registered for "${event.title}"`,
       });
 
-      // Send professional email alert to admin
-      const adminEmailHtml = getAdminRegistrationAlertEmail(event.admin.name, `${firstName} ${lastName}`, event.title);
-      await sendEmail(
-        event.admin.email,
-        `New Registration: ${event.title} 📝`,
-        `${firstName} ${lastName} has registered for your event "${event.title}".`,
-        adminEmailHtml
-      );
+      // Send professional email alert to admin only if it's not the same as the credentials owner
+      if (event.admin.email && event.admin.email !== process.env.EMAIL_USER) {
+        const adminEmailHtml = getAdminRegistrationAlertEmail(event.admin.name, `${firstName} ${lastName}`, event.title);
+        await sendEmail(
+          event.admin.email,
+          `New Registration: ${event.title} 📝`,
+          `${firstName} ${lastName} has registered for your event "${event.title}".`,
+          adminEmailHtml
+        );
+      } else {
+        console.log(`[Admin Alert] Notification sent in-app; skipping email to credentials owner (${event.admin.email})`);
+      }
 
     } catch (notifErr) {
       console.log('Admin alert failed:', notifErr.message);
@@ -338,6 +342,60 @@ exports.rejectRegistration = async (req, res) => {
     }
 
     res.json({ msg: "Registration rejected successfully", registration });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Submit feedback for a completed event
+exports.submitFeedback = async (req, res) => {
+  try {
+    const { registrationId } = req.params;
+    const { rating, feedback } = req.body;
+    const userId = req.user.id;
+
+    const registration = await Registration.findById(registrationId).populate("event");
+
+    if (!registration) {
+      return res.status(404).json({ msg: "Registration not found" });
+    }
+
+    // Check if the registration belongs to the user
+    if (registration.user.toString() !== userId) {
+      return res.status(403).json({ msg: "Unauthorized to submit feedback for this registration" });
+    }
+
+    // Check if the event date has passed
+    const currentDate = new Date();
+    const eventDate = new Date(registration.event.eventDate);
+
+    if (currentDate <= eventDate) {
+      return res.status(400).json({ msg: "Cannot submit feedback for an event that has not yet completed." });
+    }
+
+    // Check if the user's registration was accepted or attended
+    if (registration.status !== 'accepted' && registration.status !== 'attended') {
+      return res.status(400).json({ msg: "You can only submit feedback for events you were approved for." });
+    }
+
+    // Set feedback and rating
+    registration.rating = rating;
+    registration.feedback = {
+      eventExperience: feedback?.eventExperience || '',
+      dissatisfactions: feedback?.dissatisfactions || '',
+      improvements: feedback?.improvements || ''
+    };
+    
+    // Optionally automatically mark them as attended if they submit feedback
+    if (registration.status === 'accepted') {
+       registration.status = 'attended';
+    }
+
+    await registration.save();
+
+    res.json({ msg: "Feedback submitted successfully", registration });
 
   } catch (err) {
     console.error(err);
