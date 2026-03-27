@@ -12,13 +12,15 @@ import Profile from "./pages/ProfilePage";
 import EventDiscussion from "./pages/EventDiscussion";
 
 import { AuthProvider } from "./context/AuthContext";
+import { SettingsProvider } from "./context/SettingsContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
+        <SettingsProvider>
+          <Routes>
 
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Auth />} />
@@ -81,7 +83,7 @@ function App() {
           <Route
             path="/profile"
             element={
-              <ProtectedRoute role={"student"}>
+              <ProtectedRoute role={["student", "admin", "super_admin"]}>
                 <Profile />
               </ProtectedRoute>
             }
@@ -105,7 +107,8 @@ function App() {
             }
           />
 
-        </Routes>
+          </Routes>
+        </SettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import CommentsSection from "../components/CommentsSection";
@@ -11,6 +12,12 @@ const API_URL = process.env.REACT_APP_API || 'http://localhost:5000';
 export default function AdminDashboard() {
     const navigate = useNavigate();
     const { user, token } = useContext(AuthContext);
+    const { setTheme } = useSettings();
+
+    useEffect(() => {
+        setTheme('emerald');
+    }, [setTheme]);
+
     const [loading, setLoading] = useState(true);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -314,9 +321,9 @@ export default function AdminDashboard() {
                                     {/* YouTube-style Discussion for Admin */}
                                     {selectedEventData && new Date(selectedEventData.eventDate) < new Date() && (
                                         <div style={{ marginTop: '40px', padding: '32px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <CommentsSection 
-                                                eventId={selectedEvent} 
-                                                eventTitle={selectedEventData.title} 
+                                            <CommentsSection
+                                                eventId={selectedEvent}
+                                                eventTitle={selectedEventData.title}
                                             />
                                         </div>
                                     )}

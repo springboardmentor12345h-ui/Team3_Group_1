@@ -1,10 +1,12 @@
 import React, { useContext, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { useSettings } from "../context/SettingsContext";
 
 const Sidebar = ({ role, isOpen, onClose }) => {
     const location = useLocation();
     const { logout } = useContext(AuthContext);
+    const { openSettings } = useSettings();
 
     const studentMenuItems = [
         { name: "Dashboard", path: "/student", icon: "📊" },
@@ -19,6 +21,7 @@ const Sidebar = ({ role, isOpen, onClose }) => {
         { name: "Participants", path: "/admin/participants", icon: "👥" },
         { name: "Create Event", path: "/admin/create-event", icon: "➕" },
         { name: "My Events", path: "/admin/events", icon: "📅" },
+        { name: "Profile", path: "/profile", icon: "👤" },
         { name: "Settings", path: "/settings", icon: "⚙️" },
     ];
 
@@ -59,13 +62,24 @@ const Sidebar = ({ role, isOpen, onClose }) => {
                     <ul className="sidebar-menu">
                         {menuItems.map((item, index) => (
                             <li key={index}>
-                                <Link
-                                    to={item.path}
-                                    className={`menu-item ${location.pathname === item.path ? 'active' : ''}`}
-                                >
-                                    <span className="menu-icon">{item.icon}</span>
-                                    <span>{item.name}</span>
-                                </Link>
+                                {item.path === '/settings' ? (
+                                    <div
+                                        className="menu-item"
+                                        onClick={openSettings}
+                                        style={{cursor:'pointer'}}
+                                    >
+                                        <span className="menu-icon">{item.icon}</span>
+                                        <span>{item.name}</span>
+                                    </div>
+                                ) : (
+                                    <Link
+                                        to={item.path}
+                                        className={`menu-item ${location.pathname === item.path ? 'active' : ''}`}
+                                    >
+                                        <span className="menu-icon">{item.icon}</span>
+                                        <span>{item.name}</span>
+                                    </Link>
+                                )}
                             </li>
                         ))}
                     </ul>

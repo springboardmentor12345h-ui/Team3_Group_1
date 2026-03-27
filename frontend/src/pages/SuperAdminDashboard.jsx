@@ -5,6 +5,7 @@ import './SuperAdminDashboard.css';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Chatbot from '../components/chatbot';
+import { useSettings } from '../context/SettingsContext';
 
 /* Dummy event images*/
 const eventImages = {
@@ -35,7 +36,12 @@ export default function SuperAdminDashboard() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const { openSettings, setTheme } = useSettings();
+
+  useEffect(() => {
+    setTheme('sunset');
+  }, [setTheme]);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [reportFilters, setReportFilters] = useState({
     startDate: '2024-03-01',
@@ -47,6 +53,7 @@ export default function SuperAdminDashboard() {
   const [eventSearchTerm, setEventSearchTerm] = useState('');
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [eventCategoryFilter, setEventCategoryFilter] = useState('All Categories');
+  const [allRegistrations, setAllRegistrations] = useState([]);
 
   const handleGenerateReport = () => {
     if (!stats || !stats.events) return;
@@ -183,6 +190,19 @@ export default function SuperAdminDashboard() {
           time: formatTimeAgo(new Date(a.time))
         }))
       });
+
+      // Also get registrations for feedback
+      try {
+        const regRes = await fetch(`${API_URL}/api/registrations/superadmin/feedbacks`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (regRes.ok) {
+          const regs = await regRes.json();
+          setAllRegistrations(regs);
+        }
+      } catch (e) {
+        console.error("Error fetching registrations:", e);
+      }
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       setError(err.message);
@@ -338,10 +358,17 @@ export default function SuperAdminDashboard() {
             {/* Settings button */}
             <button
               className="sa-icon-btn"
-              onClick={() => setShowSettings(true)}
+              onClick={openSettings}
               aria-label="Settings"
             >
               ⚙️
+            </button>
+            <button
+              className="sa-icon-btn"
+              onClick={() => navigate('/profile')}
+              aria-label="Profile"
+            >
+              👤
             </button>
 
             <button className="sa-logout-btn" onClick={handleLogout}>Sign out →</button>
@@ -412,6 +439,7 @@ export default function SuperAdminDashboard() {
               { id: 'events', icon: '📅', label: 'Events' },
               { id: 'users', icon: '👥', label: 'Users' },
               { id: 'reports', icon: '📈', label: 'Analytics' },
+              { id: 'feedbacks', icon: '⭐', label: 'Feedbacks' }
             ].map(t => (
               <button
                 key={t.id}
@@ -427,7 +455,11 @@ export default function SuperAdminDashboard() {
 
           <div className="sa-mobile-nav-group">
             <p className="sa-mobile-nav-label">Account</p>
-            <button className="sa-mobile-nav-item" onClick={() => { setShowSettings(true); setShowMobileMenu(false); }}>
+            <button className="sa-mobile-nav-item" onClick={() => { navigate('/profile'); setShowMobileMenu(false); }}>
+              <span className="sa-nav-icon">👤</span>
+              <span className="sa-nav-label">Profile</span>
+            </button>
+            <button className="sa-mobile-nav-item" onClick={() => { openSettings(); setShowMobileMenu(false); }}>
               <span className="sa-nav-icon">⚙️</span>
               <span className="sa-nav-label">Settings</span>
             </button>
@@ -447,6 +479,7 @@ export default function SuperAdminDashboard() {
             { id: 'events', icon: '📅', label: 'Events' },
             { id: 'users', icon: '👥', label: 'Users' },
             { id: 'reports', icon: '📈', label: 'Analytics' },
+            { id: 'feedbacks', icon: '⭐', label: 'Feedbacks' }
           ].map(t => (
             <button
               key={t.id}
@@ -511,14 +544,14 @@ export default function SuperAdminDashboard() {
                 <div className="sa-tabhead">
                   <SectionHead title="Event Registry" pill={`${stats.events.length} events`} />
                   <div className="sa-filter-bar">
-                    <input 
-                      className="sa-search" 
-                      type="text" 
-                      placeholder="🔍  Search events…" 
+                    <input
+                      className="sa-search"
+                      type="text"
+                      placeholder="🔍  Search events…"
                       value={eventSearchTerm}
                       onChange={(e) => setEventSearchTerm(e.target.value)}
                     />
-                    <select 
+                    <select
                       className="sa-select"
                       value={eventCategoryFilter}
                       onChange={(e) => setEventCategoryFilter(e.target.value)}
@@ -543,7 +576,7 @@ export default function SuperAdminDashboard() {
                       {stats.events.filter(ev => {
                         const matchesSearch = ev.title?.toLowerCase().includes(eventSearchTerm.toLowerCase()) ||
                           ev.location?.toLowerCase().includes(eventSearchTerm.toLowerCase());
-                        const matchesCategory = eventCategoryFilter === 'All Categories' || 
+                        const matchesCategory = eventCategoryFilter === 'All Categories' ||
                           ev.category?.toLowerCase() === eventCategoryFilter.toLowerCase();
                         return matchesSearch && matchesCategory;
                       }).map(ev => (
@@ -581,11 +614,11 @@ export default function SuperAdminDashboard() {
               <>
                 <div className="sa-tabhead">
                   <SectionHead title="User Directory" pill={`${stats.users.length} users`} />
-                  <input 
-                    className="sa-search" 
-                    style={{ maxWidth: '360px' }} 
-                    type="text" 
-                    placeholder="🔍  Search by name or email…" 
+                  <input
+                    className="sa-search"
+                    style={{ maxWidth: '360px' }}
+                    type="text"
+                    placeholder="🔍  Search by name or email…"
                     value={userSearchTerm}
                     onChange={(e) => setUserSearchTerm(e.target.value)}
                   />
@@ -597,7 +630,7 @@ export default function SuperAdminDashboard() {
                       <th>User</th><th>Email</th><th>Role</th><th>Events</th><th>Joined</th>
                     </tr></thead>
                     <tbody>
-                      {stats.users.filter(u => 
+                      {stats.users.filter(u =>
                         u.name?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
                         u.email?.toLowerCase().includes(userSearchTerm.toLowerCase())
                       ).map(u => (
@@ -720,6 +753,44 @@ export default function SuperAdminDashboard() {
                 </button>
               </>
             )}
+
+            {/* FEEDBACKS */}
+            {activeTab === 'feedbacks' && (
+              <>
+                <SectionHead title="Event Feedbacks" pill="Community Voice" />
+                <div className="sa-table-box" style={{ background: 'var(--c-card)', borderRadius: '16px' }}>
+                  {allRegistrations.filter(r => r.rating && r.feedback).length === 0 ? (
+                    <div style={{ padding: '60px', textAlign: 'center', color: '#6b7280' }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>📝</div>
+                      No feedbacks found yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', padding: '24px' }}>
+                      {allRegistrations.filter(r => r.rating && r.feedback).map((reg, idx) => (
+                        <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', padding: '20px', borderRadius: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <strong style={{ color: '#fff', fontSize: '15px' }}>{reg.event?.title || stats?.events?.find(e => e._id === reg.event)?.title || 'Unknown Event'}</strong>
+                            <span style={{ color: '#fbbf24', fontWeight: 'bold', background: 'rgba(251,191,36,0.1)', padding: '4px 8px', borderRadius: '6px', fontSize: '13px' }}>{reg.rating} ★</span>
+                          </div>
+
+                          <div style={{ fontSize: '11px', background: 'rgba(255,255,255,0.06)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', marginBottom: '12px', color: '#94a3b8' }}>
+                            Created by: <span style={{ color: '#fff' }}>{reg.admin?.name || 'Unknown Admin'}</span>
+                          </div>
+
+                          <p style={{ fontSize: '14px', color: '#d1d5db', marginBottom: '16px', lineHeight: 1.5 }}>"{reg.feedback.eventExperience || reg.feedback}"</p>
+                          <small style={{ color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                              {(reg.firstName?.[0] || 'A').toUpperCase()}
+                            </div>
+                            {reg.firstName || 'Anonymous'} {reg.lastName || ''}
+                          </small>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
       </main>
@@ -763,52 +834,7 @@ export default function SuperAdminDashboard() {
         </div>
       )}
 
-      {/*SETTINGS MODAL*/}
-      {showSettings && (
-        <div className="sa-overlay" onClick={() => setShowSettings(false)}>
-          <div className="sa-modal sa-settings-modal" onClick={e => e.stopPropagation()}>
-            <button className="sa-modal-close" onClick={() => setShowSettings(false)}>✕</button>
 
-            <div className="sa-settings-body">
-              <div className="sa-settings-head">
-                <div className="sa-settings-icon">⚙️</div>
-                <div>
-                  <h2 className="sa-settings-title">Dashboard Settings</h2>
-                  <p className="sa-settings-sub">Manage your console preferences</p>
-                </div>
-              </div>
-
-              <div className="sa-settings-section">
-                <p className="sa-settings-label">Appearance</p>
-                <div className="sa-settings-list">
-                  <SettingToggle label="Dark Mode" sub="Use dark theme across the dashboard" defaultChecked={true} />
-                  <SettingToggle label="Compact View" sub="Reduce spacing in tables and cards" defaultChecked={false} />
-                </div>
-              </div>
-
-              <div className="sa-settings-section">
-                <p className="sa-settings-label">Notifications</p>
-                <div className="sa-settings-list">
-                  <SettingToggle label="Push Notifications" sub="Receive real-time alerts" defaultChecked={true} />
-                  <SettingToggle label="Email Digest" sub="Weekly summary sent to your email" defaultChecked={false} />
-                </div>
-              </div>
-
-              <div className="sa-settings-section">
-                <p className="sa-settings-label">Data</p>
-                <div className="sa-settings-list">
-                  <SettingToggle label="Auto-refresh Stats" sub="Refresh dashboard data every 5 minutes" defaultChecked={true} />
-                  <SettingToggle label="Debug Analytics" sub="Show raw data in reports tab" defaultChecked={false} />
-                </div>
-              </div>
-
-              <button className="sa-btn-primary sa-settings-save" onClick={() => setShowSettings(false)}>
-                Save Preferences
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <Chatbot />
     </div>
   );

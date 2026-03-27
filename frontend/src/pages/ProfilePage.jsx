@@ -1,5 +1,6 @@
 import React, { useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
+import { useSettings } from "../context/SettingsContext";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import "../styles/dashboard.css";
@@ -337,6 +338,12 @@ function EditModal({ user, onClose, onSave }) {
 // ─── Main Profile Page ────────────────────────────────────────────────────────
 function ProfilePage() {
   const auth = useAuth();
+  const { setTheme } = useSettings();
+
+  React.useEffect(() => {
+    setTheme('rose');
+  }, [setTheme]);
+
   const [profile, setProfile] = useState(() => normalizeUser(auth?.user));
   const [profileStats, setProfileStats] = useState({ registrations: 0, eventsAttended: 0 });
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -351,7 +358,7 @@ function ProfilePage() {
 
   React.useEffect(() => {
     const fetchStats = async () => {
-      if (!auth?.token) return;
+      if (!auth?.token || auth?.user?.role !== 'student') return;
       try {
         const response = await fetch(`${API_URL}/api/registrations/my-registrations`, {
           headers: { 'Authorization': `Bearer ${auth.token}` }
@@ -422,7 +429,7 @@ function ProfilePage() {
       `}</style>
 
       <div className="dashboard-container">
-        <Sidebar role="student" isOpen={sidebarOpen} onClose={closeSidebar} />
+        <Sidebar role={profile.role?.toLowerCase() || "student"} isOpen={sidebarOpen} onClose={closeSidebar} />
 
         <main className="main-content" style={{ fontFamily: "'DM Sans', sans-serif", color: "#e5e7eb" }}>
           <Header

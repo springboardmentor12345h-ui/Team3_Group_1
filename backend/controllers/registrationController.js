@@ -429,3 +429,19 @@ exports.getRegistrationById = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Get all feedbacks (superadmin)
+exports.getAllFeedbacks = async (req, res) => {
+  try {
+    const registrations = await Registration.find({ rating: { $exists: true, $ne: null } })
+      .populate("event", "title eventDate location")
+      .populate("user", "name email")
+      .populate("admin", "name email")
+      .sort({ createdAt: -1 });
+
+    res.json(registrations);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};

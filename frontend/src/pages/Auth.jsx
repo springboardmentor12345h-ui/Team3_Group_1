@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import './Auth.css';
 
 const API_URL = process.env.REACT_APP_API || 'http://localhost:5000';
@@ -10,6 +11,11 @@ const Auth = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isLogin = location.pathname === '/login';
+  const { setTheme } = useSettings();
+
+  useEffect(() => {
+    setTheme('neutral');
+  }, [setTheme]);
   
   // Animation states
   const [slideDirection, setSlideDirection] = useState('right');

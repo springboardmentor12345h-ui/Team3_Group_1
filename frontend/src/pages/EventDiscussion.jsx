@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import CommentsSection from '../components/CommentsSection';
@@ -13,13 +14,18 @@ const EventDiscussion = () => {
     const { registrationId, eventId } = useParams();
     const { user, token } = useContext(AuthContext);
     const navigate = useNavigate();
-    
+    const { setTheme } = useSettings();
+
+    useEffect(() => {
+        setTheme('ocean');
+    }, [setTheme]);
+
     const [registration, setRegistration] = useState(null);
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [submittingFeedback, setSubmittingFeedback] = useState(false);
-    
+
     const isAdmin = user?.role === 'admin';
 
     // Feedback form state
@@ -106,9 +112,9 @@ const EventDiscussion = () => {
         <div className="dashboard-container discussion-page-root">
             <Sidebar role={isAdmin ? "admin" : "student"} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
             <main className="main-content">
-                <Header 
-                    userName={user?.name || "User"} 
-                    userRole={isAdmin ? "Admin" : "Student"} 
+                <Header
+                    userName={user?.name || "User"}
+                    userRole={isAdmin ? "Admin" : "Student"}
                     id={user?.id}
                     onToggle={() => setSidebarOpen(true)}
                 />
@@ -128,7 +134,7 @@ const EventDiscussion = () => {
                                     <p>{new Date(event.eventDate).toLocaleDateString()}</p>
                                 </div>
                             </div>
-                            
+
                             <div className="feedback-container">
                                 {isAdmin ? (
                                     <div className="submitted-feedback-view">
@@ -141,10 +147,10 @@ const EventDiscussion = () => {
                                         <div className="feedback-header">
                                             <h3>Your Event Feedback</h3>
                                             <div className="star-display">
-                                                {"★".repeat(registration?.rating || 0)}{"☆".repeat(5-(registration?.rating || 0))}
+                                                {"★".repeat(registration?.rating || 0)}{"☆".repeat(5 - (registration?.rating || 0))}
                                             </div>
                                         </div>
-                                        
+
                                         <div className="feedback-item">
                                             <label>Experience</label>
                                             <p>{registration?.feedback?.eventExperience || "N/A"}</p>
@@ -164,36 +170,36 @@ const EventDiscussion = () => {
                                         <h3>Share your experience first</h3>
                                         <div className="star-rating-input">
                                             {[1, 2, 3, 4, 5].map(star => (
-                                                <span 
-                                                    key={star} 
+                                                <span
+                                                    key={star}
                                                     onClick={() => setRating(star)}
                                                     className={star <= rating ? 'star active' : 'star'}
                                                 >★</span>
                                             ))}
                                         </div>
-                                        
+
                                         <div className="input-group-v2">
                                             <label>Overall Experience</label>
-                                            <textarea 
+                                            <textarea
                                                 required
                                                 value={feedback.eventExperience}
-                                                onChange={(e) => setFeedback({...feedback, eventExperience: e.target.value})}
+                                                onChange={(e) => setFeedback({ ...feedback, eventExperience: e.target.value })}
                                                 placeholder="What did you think of the event?"
                                             />
                                         </div>
                                         <div className="input-group-v2">
                                             <label>Any Dissatisfactions?</label>
-                                            <textarea 
+                                            <textarea
                                                 value={feedback.dissatisfactions}
-                                                onChange={(e) => setFeedback({...feedback, dissatisfactions: e.target.value})}
+                                                onChange={(e) => setFeedback({ ...feedback, dissatisfactions: e.target.value })}
                                                 placeholder="Was anything not up to par?"
                                             />
                                         </div>
                                         <div className="input-group-v2">
                                             <label>Suggestions for Improvement</label>
-                                            <textarea 
+                                            <textarea
                                                 value={feedback.improvements}
-                                                onChange={(e) => setFeedback({...feedback, improvements: e.target.value})}
+                                                onChange={(e) => setFeedback({ ...feedback, improvements: e.target.value })}
                                                 placeholder="How can we do better?"
                                             />
                                         </div>

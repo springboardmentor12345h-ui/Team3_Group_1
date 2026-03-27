@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useSettings } from '../context/SettingsContext';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import './MyRegistrations.css';
@@ -25,6 +26,12 @@ const CATEGORIES = [
 const MyRegistrations = () => {
     const { user, token } = useContext(AuthContext);
     const navigate = useNavigate();
+    const { setTheme } = useSettings();
+
+    useEffect(() => {
+        setTheme('amber');
+    }, [setTheme]);
+
     const [registrations, setRegistrations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState('all');
@@ -39,6 +46,7 @@ const MyRegistrations = () => {
         upcoming: 0,
         completed: 0
     });
+    const [selectedEventDetails, setSelectedEventDetails] = useState(null);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -255,7 +263,7 @@ const MyRegistrations = () => {
                                                 <button
                                                     className="myreg-card__btn"
                                                     style={{ flex: 1 }}
-                                                    onClick={() => navigate('/events')}
+                                                    onClick={() => setSelectedEventDetails(event)}
                                                 >
                                                     View Details →
                                                 </button>
@@ -284,6 +292,43 @@ const MyRegistrations = () => {
                         </div>
                     )}
                 </div>
+
+                {/* Event Details Modal */}
+                {selectedEventDetails && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', padding: '20px',
+                        backdropFilter: 'blur(5px)'
+                    }} onClick={() => setSelectedEventDetails(null)}>
+                        <div style={{
+                            background: 'var(--c-card, #131825)', borderRadius: '16px', maxWidth: '500px', width: '100%',
+                            overflow: 'hidden', border: '1px solid var(--c-border, rgba(255,255,255,0.1))', color: 'var(--c-text-primary, #fff)',
+                            maxHeight: '90vh', overflowY: 'auto', position: 'relative'
+                        }} onClick={e => e.stopPropagation()}>
+                            <button 
+                                onClick={() => setSelectedEventDetails(null)}
+                                style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', zIndex: 10 }}
+                            >✕</button>
+                            <img src={selectedEventDetails.image} alt={selectedEventDetails.title} style={{ width: '100%', height: '220px', objectFit: 'cover' }} />
+                            <div style={{ padding: '24px' }}>
+                                <span style={{ background: getCatColor(selectedEventDetails.category), color: '#fff', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
+                                    {CATEGORIES.find(c => c.id === selectedEventDetails.category)?.name || selectedEventDetails.category}
+                                </span>
+                                <h2 style={{ margin: '16px 0 8px', fontSize: '24px' }}>{selectedEventDetails.title}</h2>
+                                <div style={{ display: 'flex', gap: '16px', fontSize: '14px', color: 'var(--c-text-sec, #9ca3af)', marginBottom: '20px' }}>
+                                    <span>📅 {new Date(selectedEventDetails.eventDate).toLocaleDateString()}</span>
+                                    <span>📍 {selectedEventDetails.location}</span>
+                                </div>
+                                <p style={{ lineHeight: '1.6', fontSize: '15px' }}>{selectedEventDetails.description}</p>
+                                <div style={{ marginTop: '24px', borderTop: '1px solid var(--c-border, rgba(255,255,255,0.1))', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{selectedEventDetails.ticketPrice ? `₹${selectedEventDetails.ticketPrice}` : 'Free'}</span>
+                                    {selectedEventDetails.capacity && <span style={{ fontSize: '14px', color: 'var(--c-text-sec, #9ca3af)' }}>Capacity: {selectedEventDetails.capacity}</span>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import EventCard from "../components/EventCard";
@@ -21,6 +22,12 @@ const getSafeImageUrl = (image) => {
 export default function StudentDashboard() {
     const navigate = useNavigate();
     const { user, token } = useContext(AuthContext);
+    const { setTheme } = useSettings();
+
+    useEffect(() => {
+        setTheme('ocean');
+    }, [setTheme]);
+
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [showProfileForm, setShowProfileForm] = useState(false);
 
@@ -137,7 +144,7 @@ export default function StudentDashboard() {
                     // 2. Student is NOT already registered for it
                     const nowDate = new Date();
                     const registeredIdSet = new Set(studentRegistrations.map(reg => (reg.event?._id || reg.event)));
-                    
+
                     const availableEvents = data.filter(ev => {
                         const eventDate = new Date(ev.eventDate);
                         const isUpcoming = eventDate > nowDate;

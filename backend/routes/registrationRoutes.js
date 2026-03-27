@@ -12,7 +12,8 @@ const {
   acceptRegistration,
   rejectRegistration,
   submitFeedback,
-  getRegistrationById
+  getRegistrationById,
+  getAllFeedbacks
 } = require('../controllers/registrationController');
 
 // Student routes
@@ -27,4 +28,8 @@ router.get('/event/:eventId', auth, requireRole('admin'), getEventRegistrations)
 router.get('/admin/all', auth, requireRole('admin'), getAdminRegistrations);
 router.put("/accept/:registrationId", auth, requireRole("admin"), acceptRegistration);
 router.put("/reject/:registrationId", auth, requireRole("admin"), rejectRegistration);
+
+// SuperAdmin routes
+router.get('/superadmin/feedbacks', auth, requireRole('superadmin'), getAllFeedbacks);
+
 module.exports = router;

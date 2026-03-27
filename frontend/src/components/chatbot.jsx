@@ -91,7 +91,7 @@ const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimised, setMinimised] = useState(false);
   const [userInput, setUserInput] = useState("");
-  const [showBadge, setShowBadge] = useState(true);
+  const [showBadge, setShowBadge] = useState(false);
   const [messages, setMessages] = useState([
     {
       id: 0,
@@ -155,7 +155,13 @@ const Chatbot = () => {
         onClick={isOpen ? () => setIsOpen(false) : openChat}
         aria-label="Toggle chatbot"
       >
-        <span className="cb-fab__icon">{isOpen ? "✕" : "💬"}</span>
+        <span className="cb-fab__icon">
+          {isOpen ? "✕" : (
+             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: '4px' }}>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+             </svg>
+          )}
+        </span>
         {showBadge && !isOpen && <span className="cb-fab__badge">1</span>}
       </button>
 

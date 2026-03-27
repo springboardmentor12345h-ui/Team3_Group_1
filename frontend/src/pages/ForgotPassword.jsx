@@ -1,11 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSettings } from '../context/SettingsContext';
 import './ForgotPassword.css';
 
 const API = process.env.REACT_APP_API || 'http://localhost:5000';
 
 const ForgotPassword = () => {
     const navigate = useNavigate();
+    const { setTheme } = useSettings();
+
+    useEffect(() => {
+        setTheme('neutral');
+    }, [setTheme]);
 
     const [step, setStep] = useState('email');
 

@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Chatbot from '../components/chatbot';
 import CommentsSection from '../components/CommentsSection';
+import { useSettings } from '../context/SettingsContext';
 
 // Map raw DB category values to human-readable labels
 const CATEGORY_LABELS = {
@@ -30,6 +31,11 @@ const getSafeImageUrl = (image) => {
 export default function AdminDashboard() {
   const { user, token, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const {  setTheme } = useSettings();
+
+  useEffect(() => {
+    setTheme('emerald');
+  }, [setTheme]);
 
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +44,7 @@ export default function AdminDashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const { openSettings } = useSettings();
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -684,7 +690,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Settings & Sign out - visible on tablet/desktop */}
-          <button className="btn-icon header-settings-btn" onClick={() => setShowSettingsModal(true)}>⚙️</button>
+          <button className="btn-icon header-settings-btn" onClick={openSettings}>⚙️</button>
           <button onClick={handleLogout} className="btn-logout">
             <span>🚪</span>
             <span className="logout-text">Sign out</span>
@@ -738,7 +744,7 @@ export default function AdminDashboard() {
           📈 Reports
         </button>
         {/* Mobile-only additional nav buttons */}
-        <button className="tab-btn tab-mobile-only" onClick={() => { setShowSettingsModal(true); setMobileMenuOpen(false); }}>
+        <button className="tab-btn tab-mobile-only" onClick={() => { openSettings(); setMobileMenuOpen(false); }}>
           ⚙️ Settings
         </button>
         <button className="tab-btn tab-mobile-only logout-tab-btn" onClick={() => { handleLogout(); setMobileMenuOpen(false); }}>
@@ -1147,14 +1153,14 @@ export default function AdminDashboard() {
                 </div>
 
                 {feedbackEventFilter && (
-                  <div className="analytics-overview" style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
-                    gap: '24px', 
-                    marginBottom: '32px', 
-                    padding: '32px', 
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%)', 
-                    borderRadius: '24px', 
+                  <div className="analytics-overview" style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '24px',
+                    marginBottom: '32px',
+                    padding: '32px',
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%)',
+                    borderRadius: '24px',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
                     backdropFilter: 'blur(10px)'
@@ -1166,7 +1172,7 @@ export default function AdminDashboard() {
                       });
                       const count = filteredRegs.length;
                       const avg = count > 0 ? (filteredRegs.reduce((s, r) => s + r.rating, 0) / count) : 0;
-                      
+
                       return (
                         <>
                           <div className="analytics-card" style={{ padding: '12px', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1184,12 +1190,12 @@ export default function AdminDashboard() {
                                     return (
                                       <div key={s} style={{ position: 'relative', fontSize: '28px', width: '28px', height: '32px' }}>
                                         <span style={{ color: 'rgba(255,255,255,0.1)', position: 'absolute', left: 0 }}>★</span>
-                                        <span style={{ 
-                                          color: '#fbbf24', 
-                                          position: 'absolute', 
-                                          left: 0, 
-                                          width: `${fill * 100}%`, 
-                                          overflow: 'hidden', 
+                                        <span style={{
+                                          color: '#fbbf24',
+                                          position: 'absolute',
+                                          left: 0,
+                                          width: `${fill * 100}%`,
+                                          overflow: 'hidden',
                                           whiteSpace: 'nowrap',
                                           filter: 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.4))'
                                         }}>★</span>
@@ -1212,9 +1218,9 @@ export default function AdminDashboard() {
                                 <div key={stars} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                                   <span style={{ minWidth: '35px', fontSize: '12px', color: '#fbbf24', fontWeight: 'bold' }}>{stars} ★</span>
                                   <div style={{ flex: 1, height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <div style={{ 
-                                      width: `${pct}%`, 
-                                      height: '100%', 
+                                    <div style={{
+                                      width: `${pct}%`,
+                                      height: '100%',
                                       background: stars >= 4 ? 'linear-gradient(90deg, #22c55e, #4ade80)' : stars >= 3 ? 'linear-gradient(90deg, #eab308, #facc15)' : 'linear-gradient(90deg, #ef4444, #f87171)',
                                       borderRadius: '10px',
                                       boxShadow: stars >= 4 ? '0 0 10px rgba(34, 197, 94, 0.3)' : 'none'
@@ -2060,44 +2066,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Settings Modal */}
-      {showSettingsModal && (
-        <div className="modal-overlay" onClick={() => setShowSettingsModal(false)}>
-          <div className="modal-content settings-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setShowSettingsModal(false)}>×</button>
-            <h2>Settings</h2>
 
-            <div className="settings-tabs">
-              <button className="settings-tab active">General</button>
-              <button className="settings-tab">Notifications</button>
-              <button className="settings-tab">Security</button>
-              <button className="settings-tab">API</button>
-            </div>
-
-            <div className="settings-content">
-              <div className="setting-item">
-                <label>
-                  <input type="checkbox" /> Enable email notifications
-                </label>
-              </div>
-              <div className="setting-item">
-                <label>
-                  <input type="checkbox" /> Auto-approve events
-                </label>
-              </div>
-              <div className="setting-item">
-                <label>Default event capacity</label>
-                <input type="number" defaultValue="100" />
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button className="btn-primary">Save Settings</button>
-              <button className="btn-secondary" onClick={() => setShowSettingsModal(false)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
       <Chatbot />
     </div>
   );
@@ -2165,10 +2134,12 @@ function EventCard({ event, onClick, onEdit }) {
         </div>
 
         <div className="event-actions">
-          <button className="btn-edit" onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}>✏️ Edit</button>
+          {event.status !== 'completed' && (
+            <button className="btn-edit" onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}>✏️ Edit</button>
+          )}
           <button className="btn-view" onClick={(e) => {
             e.stopPropagation();
             onClick();

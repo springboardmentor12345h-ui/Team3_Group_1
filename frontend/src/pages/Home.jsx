@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSettings } from '../context/SettingsContext';
 import './Home.css';
 import Chatbot from '../components/chatbot';
 
@@ -59,6 +60,12 @@ const FEATURES_BENTO = [
 
 const Home = () => {
   const navigate = useNavigate();
+  const { setTheme } = useSettings();
+
+  useEffect(() => {
+    setTheme('neutral');
+  }, [setTheme]);
+
   const [scrolled, setScrolled] = useState(false);
   const [activeTestimonial, setTestimonial] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);

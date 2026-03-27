@@ -424,6 +424,7 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import EventRegistrationForm from '../components/EventRegistrationForm';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -462,12 +463,12 @@ const isRegistrationClosed = (eventDateStr) => {
     if (!eventDateStr) return false;
     const eventDate = new Date(eventDateStr);
     eventDate.setHours(0, 0, 0, 0);
-    
+
     // "Tomorrow" relative to current time
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
-    
+
     // If event is tomorrow or earlier, registration is closed
     return eventDate <= tomorrow;
 };
@@ -475,8 +476,14 @@ const isRegistrationClosed = (eventDateStr) => {
 export default function Events() {
     const navigate = useNavigate();
     const { user, token } = useContext(AuthContext);
+    const { setTheme } = useSettings();
+
+    useEffect(() => {
+        setTheme('amethyst');
+    }, [setTheme]);
+
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    
+
     const toggleSidebar = useCallback(() => setSidebarOpen(true), []);
     const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
@@ -556,13 +563,13 @@ export default function Events() {
                     // setRegisteredEvents(registeredEventIds);
                     const registrationsMap = {};
 
-data.forEach(reg => {
-  if (reg.event && reg.event._id) {
-    registrationsMap[reg.event._id] = reg.status;
-  }
-});
+                    data.forEach(reg => {
+                        if (reg.event && reg.event._id) {
+                            registrationsMap[reg.event._id] = reg.status;
+                        }
+                    });
 
-setRegisteredEvents(registrationsMap);
+                    setRegisteredEvents(registrationsMap);
                 }
             } catch (err) {
                 console.error('Error fetching registrations:', err);
@@ -605,9 +612,9 @@ setRegisteredEvents(registrationsMap);
         if (selectedEvent) {
             // setRegisteredEvents(prev => [...prev, selectedEvent._id]);
             setRegisteredEvents(prev => ({
-  ...prev,
-  [selectedEvent._id]: "pending"
-}));
+                ...prev,
+                [selectedEvent._id]: "pending"
+            }));
         }
         setShowRegistrationForm(false);
     };
@@ -644,10 +651,10 @@ setRegisteredEvents(registrationsMap);
 
             <Sidebar role="student" isOpen={sidebarOpen} onClose={closeSidebar} />
             <main className="main-content events-main-content">
-                <Header 
-                    userName={user?.name || 'Student'} 
-                    userRole="Student" 
-                    id={user?.id} 
+                <Header
+                    userName={user?.name || 'Student'}
+                    userRole="Student"
+                    id={user?.id}
                     onToggle={toggleSidebar}
                 />
 
@@ -729,15 +736,15 @@ setRegisteredEvents(registrationsMap);
                                             {CATEGORIES.find(c => c.id === event.category)?.emoji}{' '}
                                             {CATEGORIES.find(c => c.id === event.category)?.name || event.category}
                                         </span>
-                                     {registeredEvents[event._id] && (
-  <span className="registered-badge">
-    {registeredEvents[event._id] === "pending"
-      ? "⏳ Pending"
-      : registeredEvents[event._id] === "accepted"
-      ? "✔ Registered"
-      : "❌ Rejected"}
-  </span>
-)}
+                                        {registeredEvents[event._id] && (
+                                            <span className="registered-badge">
+                                                {registeredEvents[event._id] === "pending"
+                                                    ? "⏳ Pending"
+                                                    : registeredEvents[event._id] === "accepted"
+                                                        ? "✔ Registered"
+                                                        : "❌ Rejected"}
+                                            </span>
+                                        )}
                                     </div>
 
                                     <div className="event-card-body">
@@ -768,17 +775,17 @@ setRegisteredEvents(registrationsMap);
                                                 onClick={e => { e.stopPropagation(); handleRegister(event._id); }}
                                                 disabled={isRegistrationClosed(event.date) || spotsLeft(event) === 0 || (registeredEvents[event._id] && registeredEvents[event._id] !== 'rejected')}
                                             >
-                                                        {isRegistrationClosed(event.date)
-  ? "Event Completed"
-  : registeredEvents[event._id] === "pending"
-  ? "⏳ Pending Approval"
-  : registeredEvents[event._id] === "accepted"
-  ? "✔ Registered"
-  : registeredEvents[event._id] === "rejected"
-  ? "Re-register"
-  : spotsLeft(event) === 0
-  ? "Full"
-  : "Register"}
+                                                {isRegistrationClosed(event.date)
+                                                    ? "Event Completed"
+                                                    : registeredEvents[event._id] === "pending"
+                                                        ? "⏳ Pending Approval"
+                                                        : registeredEvents[event._id] === "accepted"
+                                                            ? "✔ Registered"
+                                                            : registeredEvents[event._id] === "rejected"
+                                                                ? "Re-register"
+                                                                : spotsLeft(event) === 0
+                                                                    ? "Full"
+                                                                    : "Register"}
                                             </button>
                                         </div>
                                     </div>
